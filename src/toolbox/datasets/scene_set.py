@@ -22,6 +22,7 @@ from toolbox.geometry.transform import Transform
 import toolbox.utils.tensor_collection as tc
 
 
+# Type aliases
 Resolution = Tuple[int, int]
 ListPose = List[List[float]]
 ListBbox = List[int]
@@ -47,13 +48,23 @@ tensors:
 """
 SceneObservationTensorCollection = tc.PandasTensorCollection
 
+
 def transform_to_list(T: Transform) -> ListPose:
+    """Convert a Transform object to a list. The rotation is represented as a
+    quaternion.
+
+    Args:
+        T (Transform): The transform object.
+
+    Returns:
+        ListPose: The list representation of the transform.
+    """
     return [T.quaternion.coeffs().tolist(), T.translation.tolist()]
 
 
 @dataclass
 class ObjectData:
-    # NOTE (Yann): bbox_amodal, bbox_modal, visib_fract should be moved to
+    # NOTE: (Yann): bbox_amodal, bbox_modal, visib_fract should be moved to
     # SceneObservation
     label: str
     TWO: Optional[Transform] = None
@@ -172,6 +183,10 @@ class ObservationInfos:
 
 @dataclass
 class SceneObservation:
+    """
+    A scene observation. It contains all the information about a scene at a
+    particular view (e.g. RGB and depth images, camera intrinsics, objects, etc.)
+    """
     rgb: Optional[np.ndarray] = None  # (h,w,3) uint8 numpy array
     depth: Optional[np.ndarray] = None  # (h, w), np.float32
     segmentation: Optional[np.ndarray] = None  # (h, w), np.uint32 (important);
@@ -391,17 +406,18 @@ class SceneObservation:
         if TCO_init is not None:
             data.register_tensor("TCO_init", TCO_init)
             data.register_tensor("poses_init", TCO_init)
+        
         return data
 
 
-class SceneDataset(torch.utils.data.Dataset):
+class SceneSet(torch.utils.data.Dataset):
     def __init__(
         self,
         frame_index: Optional[pd.DataFrame],
         load_depth: bool = False,
         load_segmentation: bool = True,
     ):
-        """Scene dataset.
+        """Scene set.
         Can be an IterableDataset or a map-style Dataset.
 
         Args:
@@ -438,25 +454,31 @@ class SceneDataset(torch.utils.data.Dataset):
         raise NotImplementedError
 
 
-class IterableSceneDataset:
+class IterableSceneSet:
     def __iter__(self) -> Iterator[SceneObservation]:
         """Returns an infinite iterator over SceneObservation samples."""
         raise NotImplementedError
 
 
-class RandomIterableSceneDataset(IterableSceneDataset):
-    """RandomIterableSceneDataset.
+class RandomIterableSceneSet(IterableSceneSet):
+    """RandomIterableSceneSet.
 
     Generates an infinite iterator over SceneObservation by
-    randomly sampling from a SceneDataset.
+    randomly sampling from a SceneSet.
     """
-
     def __init__(
         self,
-        scene_ds: SceneDataset,
+        scene_set: SceneSet,
         deterministic: bool = False,
-    ):
-        self.scene_ds = scene_ds
+    ) -> None:
+        """Constructor.
+
+        Args:
+            scene_set (SceneSet): The scene set.
+            deterministic (bool, optional): Whether to iterate deterministically or not.
+                Defaults to False.
+        """
+        self.scene_set = scene_set
         self.deterministic = deterministic
         self.worker_seed_fn = wds.utils.pytorch_worker_seed
 
@@ -472,17 +494,28 @@ class RandomIterableSceneDataset(IterableSceneDataset):
             )
         self.rng = random.Random(seed)
         while True:
-            idx = self.rng.randint(0, len(self.scene_ds) - 1)
-            yield self.scene_ds[idx]
+            idx = self.rng.randint(0, len(self.scene_set) - 1)
+            yield self.scene_set[idx]
 
 
-class IterableMultiSceneDataset(IterableSceneDataset):
+class IterableMultiSceneSet(IterableSceneSet):
+    """
+    IterableMultiSceneSet. An iterable set from a list of scene sets.
+    """
     def __init__(
         self,
-        list_iterable_scene_ds: List[IterableSceneDataset],
+        list_iterable_scene_set: List[IterableSceneSet],
         deterministic: bool = False,
     ) -> None:
-        self.list_iterable_scene_ds = list_iterable_scene_ds
+        """Constructor.
+
+        Args:
+            list_iterable_scene_set (List[IterableSceneSet]): List of iterable scene
+                sets.
+            deterministic (bool, optional): Whether to iterate deterministically or not.
+                Defaults to False.
+        """
+        self.list_iterable_scene_set = list_iterable_scene_set
         self.deterministic = deterministic
         self.worker_seed_fn = wds.utils.pytorch_worker_seed
 
@@ -499,7 +532,7 @@ class IterableMultiSceneDataset(IterableSceneDataset):
             )
         
         self.rng = random.Random(seed)
-        self.iterators = [iter(ds) for ds in self.list_iterable_scene_ds]
+        self.iterators = [iter(scene_set) for scene_set in self.list_iterable_scene_set]
         
         while True:
             idx = self.rng.randint(0, len(self.iterators) - 1)

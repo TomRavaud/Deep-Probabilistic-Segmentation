@@ -17,7 +17,7 @@ from torchvision.datasets import VOCSegmentation
 from torch.utils.data import Dataset
 
 # Custom modules
-from toolbox.datasets.scene_dataset import Resolution, SceneObservation
+from toolbox.datasets.scene_set import Resolution, SceneObservation
 from toolbox.geometry.camera_geometry import get_K_crop_resize
 
 

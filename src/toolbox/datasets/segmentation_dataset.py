@@ -12,8 +12,8 @@ import numpy as np
 
 # Custom modules
 from toolbox.datasets.augmentations import SceneObservationTransform
-from toolbox.datasets.scene_dataset import (
-    IterableSceneDataset,
+from toolbox.datasets.scene_set import (
+    IterableSceneSet,
     SceneObservation,
     ObjectData,
 )
@@ -81,7 +81,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
     """
     def __init__(
         self,
-        scene_ds: IterableSceneDataset,
+        scene_set: IterableSceneSet,
         min_area: Optional[float] = None,
         return_first_object: bool = False,
         keep_labels_set: Optional[Set[str]] = None,
@@ -94,7 +94,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         """Initialize the ObjectSegmentationDataset.
 
         Args:
-            scene_ds (IterableSceneDataset): Scene dataset.
+            scene_set (IterableSceneSet): Scene set.
             min_area (Optional[float], optional): Minimum area constraint for the object
                 to be considered valid in the observation. Defaults to None.
             return_first_object (bool, optional): Whether to return the first valid
@@ -115,7 +115,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 of augmentations to apply to the background of the observation.
                 Defaults to [].
         """
-        self._scene_ds = scene_ds
+        self._scene_set = scene_set
         self._min_area = min_area
         
         self._return_first_object = return_first_object
@@ -343,7 +343,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             Iterator[SegmentationData]: Iterator over the dataset.
         """
         # Iterator over the scene dataset
-        iterator = iter(self._scene_ds)
+        iterator = iter(self._scene_set)
         
         while True:
             # Find a valid data

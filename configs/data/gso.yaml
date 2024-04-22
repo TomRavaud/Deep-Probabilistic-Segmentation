@@ -1,40 +1,39 @@
 # Class used to instantiate the DataModule
-_target_: data.gso_datamodule.GSODataModule
+_target_: datamodules.gso_datamodule.GSODataModule
 
 #-------------------------------------------------------#
 # Parameters that are passed to the LightningDataModule #
 #-------------------------------------------------------#
 
-data_dir: ${paths.data_dir}
+# Object set
+object_set_cfg:
+  # Directory and name of the object set (3D models to render)
+  dir: ${paths.data_dir}/google_scanned_objects
+  name: gso.normalized
 
-# Name of the dataset (where scene images are stored)
-# Here, we use the Google Scanned Objects dataset
-dataset_name: gso_1M
+# Scene set(s)
+scene_set_cfg:
+  dir: ${paths.data_dir}
+  sets_cfg:
+    - name: webdataset.gso_1M
+      n_repeats: 1
 
-# Directory and name of the object set (3D models to render)
-objset_dir: ${paths.data_dir}/google_scanned_objects
-objset_name: gso.normalized
-
-# Dataloader parameters
-batch_size: 16
-num_workers: 2
-pin_memory: False
-
-# Scene dataset(s)
-scene_dataset:
-  - name: webdataset.gso_1M
-    n_repeats: 1
-
-
-# Parameters for the dataset creation
-dataset_kwargs:
+# Dataset parameters
+dataset_cfg:
   min_area: null
   return_first_object: False
   keep_labels_set: null
   valid_data_max_attempts: 200
 
+# Dataloader parameters
+dataloader_cfg:
+  batch_size: 16
+  num_workers: 2
+  pin_memory: False
+  persistent_workers: True
+
 # Parameters for the data transforms (e.g., normalization, resizing, augmentation, etc.)
-transformations:
+transformations_cfg:
   resize: (480, 640)
 
   # List of background augmentations to apply

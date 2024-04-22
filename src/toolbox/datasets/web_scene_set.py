@@ -14,9 +14,9 @@ import io
 
 # Custom modules
 from toolbox.utils.webdataset import tarfile_to_samples
-from toolbox.datasets.scene_dataset import (
-    IterableSceneDataset,
-    SceneDataset,
+from toolbox.datasets.scene_set import (
+    IterableSceneSet,
+    SceneSet,
     SceneObservation,
     CameraData,
     ObservationInfos,
@@ -25,7 +25,7 @@ from toolbox.datasets.scene_dataset import (
 )
 
 
-class WebSceneDataset(SceneDataset):
+class WebSceneSet(SceneSet):
     def __init__(
         self,
         wds_dir: Path,
@@ -115,15 +115,15 @@ def load_scene_ds_obs(
         camera_data=camera_data,
     )
 
-class IterableWebSceneDataset(IterableSceneDataset):
-    def __init__(self, web_scene_dataset: WebSceneDataset, buffer_size: int = 1):
-        self.web_scene_dataset = web_scene_dataset
+class IterableWebSceneSet(IterableSceneSet):
+    def __init__(self, web_scene_set: WebSceneSet, buffer_size: int = 1):
+        self.web_scene_set = web_scene_set
 
         load_scene_ds_obs_ = partial(
             load_scene_ds_obs,
-            # depth_scale=self.web_scene_dataset.depth_scale,
-            load_depth=self.web_scene_dataset.load_depth,
-            label_format=self.web_scene_dataset.label_format,
+            # depth_scale=self.web_scene_set.depth_scale,
+            load_depth=self.web_scene_set.load_depth,
+            label_format=self.web_scene_set.label_format,
         )
 
         def load_scene_ds_obs_iterator(
@@ -133,7 +133,7 @@ class IterableWebSceneDataset(IterableSceneDataset):
                 yield load_scene_ds_obs_(sample)
 
         self.datapipeline = wds.DataPipeline(
-            wds.ResampledShards(self.web_scene_dataset.get_tar_list()),
+            wds.ResampledShards(self.web_scene_set.get_tar_list()),
             tarfile_to_samples(),
             load_scene_ds_obs_iterator,
             wds.shuffle(buffer_size),
