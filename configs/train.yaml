@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+  - data: gso
+  - model: null
+  - callbacks: null
+  - logger: null
+  - trainer: null
+  - paths: default
+  - extras: null
+  - hydra: default
+
+
+# Task name, determines output directory path
+task_name: "train"

@@ -1,0 +1,51 @@
+# Class used to instantiate the DataModule
+_target_: data.gso_datamodule.GSODataModule
+
+#-------------------------------------------------------#
+# Parameters that are passed to the LightningDataModule #
+#-------------------------------------------------------#
+
+data_dir: ${paths.data_dir}
+
+# Name of the dataset (where scene images are stored)
+# Here, we use the Google Scanned Objects dataset
+dataset_name: gso_1M
+
+# Directory and name of the object set (3D models to render)
+objset_dir: ${paths.data_dir}/google_scanned_objects
+objset_name: gso.normalized
+
+# Dataloader parameters
+batch_size: 16
+num_workers: 2
+pin_memory: False
+
+# Scene dataset(s)
+scene_dataset:
+  - name: webdataset.gso_1M
+    n_repeats: 1
+
+
+# Parameters for the dataset creation
+dataset_kwargs:
+  min_area: null
+  return_first_object: False
+  keep_labels_set: null
+  valid_data_max_attempts: 200
+
+# Parameters for the data transforms (e.g., normalization, resizing, augmentation, etc.)
+transformations:
+  resize: (480, 640)
+
+  # List of background augmentations to apply
+  background_augmentations:
+    - type: VOCBackgroundAugmentation
+      params:
+        voc_root: ${paths.data_dir}/VOCdevkit/VOC2012
+        p: 0.5
+  
+  # List of rgb augmentations to apply
+  rgb_augmentations:
+
+  # List of depth augmentations to apply
+  depth_augmentations:
