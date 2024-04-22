@@ -1,0 +1,14 @@
+- type: DepthBlurTransform
+  params:
+    p: 0.3
+- type: DepthEllipseDropoutTransform
+  params:
+    p: 0.3
+- type: DepthGaussianNoiseTransform
+  params:
+    std_dev: 0.01
+    p: 0.3
+- type: DepthMissingTransform
+  params:
+    max_missing_fraction: 0.2
+    p: 0.3

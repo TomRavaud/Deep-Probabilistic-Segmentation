@@ -1,0 +1,4 @@
+- type: VOCBackgroundAugmentation
+  params:
+    voc_root: ${paths.data_dir}/VOCdevkit/VOC2012
+    p: 0.5

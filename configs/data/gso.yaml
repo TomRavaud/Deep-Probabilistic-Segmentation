@@ -1,3 +1,12 @@
+defaults:
+  # Load the list of RGB augmentations to apply
+  - transformations_cfg/rgb_augmentations: default
+  # Load the list of depth augmentations to apply
+  - transformations_cfg/depth_augmentations: light
+  # Load the list of background augmentations to apply
+  - transformations_cfg/background_augmentations: default
+  - _self_
+
 # Class used to instantiate the DataModule
 _target_: datamodules.gso_datamodule.GSODataModule
 
@@ -34,17 +43,15 @@ dataloader_cfg:
 
 # Parameters for the data transforms (e.g., normalization, resizing, augmentation, etc.)
 transformations_cfg:
-  resize: (480, 640)
 
-  # List of background augmentations to apply
+  # Resize the images to the specified size
+  resize: [480, 640]
+
+  # Probability of applying the augmentations
+  augmentations_p: 0.8
+
+  # Override the default background augmentations
   background_augmentations:
-    - type: VOCBackgroundAugmentation
-      params:
-        voc_root: ${paths.data_dir}/VOCdevkit/VOC2012
-        p: 0.5
   
-  # List of rgb augmentations to apply
-  rgb_augmentations:
-
-  # List of depth augmentations to apply
+  # Override the default depth augmentations
   depth_augmentations:

@@ -1,0 +1,36 @@
+- type: DepthBlurTransform
+  params:
+    p: 0.3
+- type: DepthCorrelatedGaussianNoiseTransform
+  params:
+    gp_rescale_factor_min: 15.0
+    gp_rescale_factor_max: 40.0
+    std_dev: 0.01
+    p: 0.3
+- type: DepthEllipseDropoutTransform
+  params:
+    ellipse_dropout_mean: 175.0
+    ellipse_gamma_shape: 5.0
+    ellipse_gamma_scale: 2.0
+    p: 0.5
+- type: DepthEllipseNoiseTransform
+  params:
+    ellipse_dropout_mean: 175.0
+    ellipse_gamma_shape: 5.0
+    ellipse_gamma_scale: 2.0
+    std_dev: 0.01
+    p: 0.5
+- type: DepthGaussianNoiseTransform
+  params:
+    std_dev: 0.01
+    p: 0.3
+- type: DepthMissingTransform
+  params:
+    max_missing_fraction: 0.9
+    p: 0.3
+- type: DepthDropoutTransform
+  params:
+    p: 0.3
+- type: DepthBackgroundDropoutTransform
+  params:
+    p: 0.2

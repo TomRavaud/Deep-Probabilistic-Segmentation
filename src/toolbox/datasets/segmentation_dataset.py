@@ -11,7 +11,7 @@ import torch
 import numpy as np
 
 # Custom modules
-from toolbox.datasets.augmentations import SceneObservationTransform
+from toolbox.datasets.transformations import SceneObservationTransform
 from toolbox.datasets.scene_set import (
     IterableSceneSet,
     SceneObservation,
@@ -87,9 +87,9 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         keep_labels_set: Optional[Set[str]] = None,
         valid_data_max_attempts: int = 200,
         resize_transform: Optional[SceneObservationTransform] = None,
-        rgb_augmentations: List[SceneObservationTransform] = [],
-        depth_augmentations: List[SceneObservationTransform] = [],
-        background_augmentations: List[SceneObservationTransform] = [],
+        rgb_augmentations: Optional[SceneObservationTransform] = None,
+        depth_augmentations: Optional[SceneObservationTransform] = None,
+        background_augmentations: Optional[SceneObservationTransform] = None,
     ) -> None:
         """Initialize the ObjectSegmentationDataset.
 
@@ -105,15 +105,15 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 a valid data in the dataset. Defaults to 200.
             resize_transform (Optional[SceneObservationTransform], optional): Resize
                 transformation to apply to the observation. Defaults to None.
-            rgb_augmentations (List[SceneObservationTransform], optional): List of
-                augmentations to apply to the RGB image of the observation.
-                Defaults to [].
-            depth_augmentations (List[SceneObservationTransform], optional): List of
-                augmentations to apply to the depth image of the observation.
-                Defaults to [].
-            background_augmentations (List[SceneObservationTransform], optional): List
-                of augmentations to apply to the background of the observation.
-                Defaults to [].
+            rgb_augmentations (Optional[SceneObservationTransform], optional):
+                Augmentations to apply to the RGB image of the observation. Defaults
+                to [].
+            depth_augmentations (Optional[SceneObservationTransform], optional):
+                Augmentations to apply to the depth image of the observation. Defaults
+                to [].
+            background_augmentations (Optional[SceneObservationTransform], optional):
+                Augmentations to apply to the background of the observation. Defaults
+                to [].
         """
         self._scene_set = scene_set
         self._min_area = min_area
@@ -224,18 +224,18 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         timings["resize_augmentation"] = time.time() - s
 
         s = time.time()
-        for aug in self._background_augmentations:
-            obs = aug(obs)
+        if self._background_augmentations is not None:
+            obs = self._background_augmentations(obs)
         timings["background_augmentation"] = time.time() - s
 
         s = time.time()
-        for aug in self._rgb_augmentations:
-            obs = aug(obs)
+        if self._rgb_augmentations is not None:
+            obs = self._rgb_augmentations(obs)
         timings["rgb_augmentation"] = time.time() - s
 
         s = time.time()
-        for aug in self._depth_augmentations:
-            obs = aug(obs)
+        if self._depth_augmentations is not None:
+            obs = self._depth_augmentations(obs)
         timings["depth_augmentation"] = time.time() - s
 
         # Get the unique visible ids in the segmentation

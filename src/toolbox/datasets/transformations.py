@@ -287,7 +287,7 @@ class PillowBlur(SceneObservationTransform):
         rgb_pil = PIL.Image.fromarray(obs.rgb)
         
         # Set a random blur factor
-        k = random.randint(*self.factor_interval)
+        k = random.randint(*self._factor_interval)
         
         # Apply a Gaussian blur to the image
         rgb_pil = rgb_pil.filter(PIL.ImageFilter.GaussianBlur(k))
@@ -1016,7 +1016,6 @@ class CropResizeToAspectTransform(SceneObservationTransform):
         Raises:
             ValueError: If the RGB observation is None.
             ValueError: If the segmentation observation is None.
-            ValueError: If the binary masks are None.
             ValueError: If the camera data is None.
             ValueError: If the object datas are None.
             ValueError: If the segmentation dtype is not uint32.
@@ -1031,8 +1030,6 @@ class CropResizeToAspectTransform(SceneObservationTransform):
             raise ValueError("The RGB observation is None.")
         elif obs.segmentation is None:
             raise ValueError("The segmentation observation is None.")
-        elif obs.binary_masks is None:
-            raise ValueError("The binary masks are None.")
         elif obs.camera_data is None:
             raise ValueError("The camera data is None.")
         elif obs.object_datas is None:
@@ -1064,7 +1061,7 @@ class CropResizeToAspectTransform(SceneObservationTransform):
                 raise ValueError("The depth mode is not 'F'.")
 
         # Match the width on input image with an image of target aspect ratio.
-        if not np.isclose(w / h, self.aspect):
+        if not np.isclose(w / h, self._aspect):
             r = self._aspect
             crop_h = w * 1 / r
             x0, y0 = w / 2, h / 2

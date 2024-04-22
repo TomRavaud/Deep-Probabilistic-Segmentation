@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 # import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 # Custom modules
 from toolbox.datasets.object_set import RigidObjectSet
@@ -14,6 +14,7 @@ from toolbox.datasets.make_sets import (
     make_object_set,
     make_iterable_scene_set,
 )
+import toolbox.datasets.transformations as transformations
 
 
 class GSODataModule(LightningDataModule):
@@ -55,7 +56,7 @@ class GSODataModule(LightningDataModule):
         # Called on every process in DDP.
         # Clean up after fit or test.
     ```
-    """
+    """  
     def __init__(
         self,
         object_set_cfg: Optional[DictConfig] = None,
@@ -77,9 +78,6 @@ class GSODataModule(LightningDataModule):
                 dataloader. Defaults to None.
             transformations_cfg (Optional[DictConfig], optional): Configuration for the
                 transformations to apply to the data. Defaults to None.
-
-        Raises:
-            ValueError: If `transformations_cfg` is not a `DictConfig`.
         """
         super().__init__()
 
@@ -87,130 +85,43 @@ class GSODataModule(LightningDataModule):
         # and store them in the checkpoints.
         self.save_hyperparameters(logger=False)
 
-
         # Set transformations
-        if transformations_cfg is None:
-            self._resize_transform = None
-            self._background_augmentations = []
-            self._rgb_augmentations = []
-            self._depth_augmentations = []
-        elif isinstance(transformations_cfg, DictConfig):
-            #TODO: here
-            self._resize_transform = None
-            self._background_augmentations = []
-            self._rgb_augmentations = []
-            self._depth_augmentations = []
-        else:
-            raise ValueError("Invalid type for transformations_cfg."
-                             "Must be a DictConfig.")
+        self._resize_transform = None
+        self._background_augmentations = None
+        self._rgb_augmentations = None
+        self._depth_augmentations = None
         
-        # Resize transform
-        # self._resize_transform = CropResizeToAspectTransform(resize=transformations.resize)
-        
-        # FIXME: do I need to put this in a list?
-        # Background augmentations
-        # self._background_augmentations = []
-        
-        # if 'background_augmentations' in transformations:
-        #     for aug in transformations.background_augmentations:
-        #         aug_type = getattr(toolbox.datasets.augmentations, aug.type)
-        #         self._background_augmentations.append(aug_type(**aug.params))
-        
-        # TODO: do the same for depth and rgb augmentations: with compose
-        
-        # Background augmentations
-        # self._background_augmentations = []
-        
-        # if transform.background_augmentation:
-        #     self._background_augmentations += [
-        #         (
-        #                 VOCBackgroundAugmentation(transform.background_augmentation.),
-        #         ),
-        #     ]
-
-        # # Foreground augmentations
-        # self._rgb_augmentations = []
-        # if apply_rgb_augmentation:
-        #     self._rgb_augmentations += [
-        #         SceneObsAug(
-        #             [
-        #                 SceneObsAug(PillowBlur(factor_interval=(1, 3)), p=0.4),
-        #                 SceneObsAug(
-        #                     PillowSharpness(factor_interval=(0.0, 50.0)),
-        #                     p=0.3,
-        #                 ),
-        #                 SceneObsAug(PillowContrast(factor_interval=(0.2, 50.0)), p=0.3),
-        #                 SceneObsAug(
-        #                     PillowBrightness(factor_interval=(0.1, 6.0)),
-        #                     p=0.5,
-        #                 ),
-        #                 SceneObsAug(PillowColor(factor_interval=(0.0, 20.0)), p=0.3),
-        #             ],
-        #             p=0.8,
-        #         ),
-        #     ]
-
-        # # Depth augmentations
-        # self._depth_augmentations = []
-        # if apply_depth_augmentation:
-        #     # original augmentations
-        #     if depth_augmentation_level == 0:
-        #         self._depth_augmentations += [
-        #             SceneObsAug(DepthBlurTransform(), p=0.3),
-        #             SceneObsAug(DepthEllipseDropoutTransform(), p=0.3),
-        #             SceneObsAug(DepthGaussianNoiseTransform(std_dev=0.01), p=0.3),
-        #             SceneObsAug(DepthMissingTransform(max_missing_fraction=0.2), p=0.3),
-        #         ]
-
-        #     # medium augmentation
-        #     elif depth_augmentation_level in {1, 2}:
-        #         # medium augmentation
-        #         self._depth_augmentations += [
-        #             SceneObsAug(DepthBlurTransform(), p=0.3),
-        #             SceneObsAug(
-        #                 DepthCorrelatedGaussianNoiseTransform(
-        #                     gp_rescale_factor_min=15.0,
-        #                     gp_rescale_factor_max=40.0,
-        #                     std_dev=0.01,
-        #                 ),
-        #                 p=0.3,
-        #             ),
-        #             SceneObsAug(
-        #                 DepthEllipseDropoutTransform(
-        #                     ellipse_dropout_mean=175.0,
-        #                     ellipse_gamma_shape=5.0,
-        #                     ellipse_gamma_scale=2.0,
-        #                 ),
-        #                 p=0.5,
-        #             ),
-        #             SceneObsAug(
-        #                 DepthEllipseNoiseTransform(
-        #                     ellipse_dropout_mean=175.0,
-        #                     ellipse_gamma_shape=5.0,
-        #                     ellipse_gamma_scale=2.0,
-        #                     std_dev=0.01,
-        #                 ),
-        #                 p=0.5,
-        #             ),
-        #             SceneObsAug(DepthGaussianNoiseTransform(std_dev=0.01), p=0.1),
-        #             SceneObsAug(DepthMissingTransform(max_missing_fraction=0.9), p=0.3),
-        #         ]
-
-        #         # Set the depth image to zero occasionally.
-        #         if depth_augmentation_level == 2:
-        #             self.depth_augmentations.append(
-        #                 SceneObsAug(DepthDropoutTransform(), p=0.3),
-        #             )
-        #             self.depth_augmentations.append(
-        #                 SceneObsAug(DepthBackgroundDropoutTransform(), p=0.2),
-        #             )
-        #         self.depth_augmentations = [
-        #             SceneObsAug(self.depth_augmentations, p=0.8),
-        #         ]
-        #     else:
-        #         msg = f"Unknown depth augmentation type {depth_augmentation_level}"
-        #         raise ValueError(msg)
-        
+        if isinstance(transformations_cfg, DictConfig):
+            
+            # Resize transform
+            if "resize" in transformations_cfg:
+                self._resize_transform = transformations.CropResizeToAspectTransform(
+                    resize=transformations_cfg.resize
+                )
+            
+            # RGB augmentations
+            if "rgb_augmentations" in transformations_cfg and\
+                isinstance(transformations_cfg.rgb_augmentations, ListConfig):
+                self._rgb_augmentations = self._set_transformations(
+                    transformations_cfg.rgb_augmentations,
+                    p=transformations_cfg.augmentations_p,
+                )
+            
+            # Depth augmentations
+            if "depth_augmentations" in transformations_cfg and\
+                isinstance(transformations_cfg.depth_augmentations, ListConfig):
+                self._depth_augmentations = self._set_transformations(
+                    transformations_cfg.depth_augmentations,
+                    p=transformations_cfg.augmentations_p,
+                )
+            
+            # Background augmentations
+            if "background_augmentations" in transformations_cfg and\
+                isinstance(transformations_cfg.background_augmentations, ListConfig):
+                self._background_augmentations = self._set_transformations(
+                    transformations_cfg.background_augmentations,
+                    p=transformations_cfg.augmentations_p,
+                )
         
         # Variable to store the object set
         self._object_set: Optional[RigidObjectSet] = None
@@ -318,6 +229,36 @@ class GSODataModule(LightningDataModule):
         :param state_dict: The datamodule state returned by `self.state_dict()`.
         """
         pass
+    
+    @staticmethod
+    def _set_transformations(
+        transformations_list_cfg: ListConfig,
+        p: float = 1.0,
+    ) -> transformations.SceneObservationTransform:
+        """Set the transformations to apply to the data. It composes the transformations
+        listed in the configuration.
+
+        Args:
+            transformations_list_cfg (ListConfig): List of transformations to compose
+                and apply to the data.
+            p (float, optional): Probability of applying the transformations. Defaults
+                to 1.0.
+
+        Returns:
+            transformations.SceneObservationTransform: Composed transformations.
+        """
+        transformations_list = []
+        
+        # Parse the configuration for the transformations
+        for trans in transformations_list_cfg:
+            trans_type = getattr(transformations, trans.type)
+            transformations_list.append(trans_type(**trans.params))
+
+        # Compose the transformations
+        return transformations.ComposeSceneObservationTransform(
+            transformations_list,
+            p=p,
+        )
 
 
 if __name__ == "__main__":

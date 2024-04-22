@@ -1,0 +1,20 @@
+- type: PillowBlur
+  params:
+    factor_interval: [1, 3]
+    p: 0.4
+- type: PillowSharpness
+  params:
+    factor_interval: [0.0, 50.0]
+    p: 0.3
+- type: PillowContrast
+  params:
+    factor_interval: [0.2, 50.0]
+    p: 0.3
+- type: PillowBrightness
+  params:
+    factor_interval: [0.1, 6.0]
+    p: 0.5
+- type: PillowColor
+  params:
+    factor_interval: [0.0, 20.0]
+    p: 0.3
