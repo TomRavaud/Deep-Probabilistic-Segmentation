@@ -7,10 +7,34 @@ Development of a deep probabilistic binary segmentation model for the segmentati
 
 ## Installation
 
-### Conda environment
+You first need to clone the repository main branch:
 
-To create a conda environment with all the necessary dependencies, run the following command:
+```bash
+git clone https://github.com/TomRavaud/deep_probabilistic_segmentation.git
+cd deep_probabilistic_segmentation
+```
+
+Then, you need to install the required dependencies. The project uses conda to manage the dependencies. You can create a new conda environment using the provided `environment.yaml` file:
 
 ```bash
 conda env create -f environment.yml
 ```
+
+## Usage
+
+To activate the conda environment, run:
+
+```bash
+conda activate deep_probabilistic_segmentation
+```
+
+You can now run scripts located in the `src/scripts` directory from the root of the repository. For example, to train the model, run:
+
+```bash
+python src/scripts/train.py
+```
+
+
+## Acknowledgement
+
+Some of the code is borrowed from [MegaPose](https://github.com/megapose6d/megapose6d), maintained in [happypose](https://github.com/agimus-project/happypose/tree/dev). It made it easier to get to grips with the dataset used to train MegaPose.
