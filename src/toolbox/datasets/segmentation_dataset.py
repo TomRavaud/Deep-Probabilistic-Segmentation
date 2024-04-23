@@ -130,9 +130,9 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         
         # Timings to construct the data from the observation
         self._timings = None
-        
-
-    def collate_fn(self, list_data: List[SegmentationData]) -> BatchSegmentationData:
+    
+    @staticmethod
+    def collate_fn(list_data: List[SegmentationData]) -> BatchSegmentationData:
         """Collate a list of SegmentationData into a BatchSegmentationData. It replaces
         the default collate_fn of the DataLoader to handle the custom data type.
 
@@ -204,7 +204,8 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         
         A random object in the scene is selected randomly. It is considered valid if:
             1. It is visible enough (its visible 2D area is >= min_area) ;
-            2. It belongs to the set of objects to keep (if keep_objects_set isn't None).
+            2. It belongs to the set of objects to keep (if keep_objects_set isn't
+                None).
 
         Args:
             obs (SceneObservation): Scene observation.
@@ -258,8 +259,14 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 valid = True
 
             if valid and self._min_area is not None:
+                # We work with the modal bbox, ie the box bounding only the visible
+                # pixels of the object
                 bbox = obj.bbox_modal
+                
+                # Area of the bbox
                 area = (bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
+                
+                # Check if the area is greater than the minimum area
                 if area >= self._min_area:
                     valid = True
                 else:

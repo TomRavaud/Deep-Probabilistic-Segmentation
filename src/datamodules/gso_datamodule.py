@@ -102,7 +102,7 @@ class GSODataModule(LightningDataModule):
             # RGB augmentations
             if "rgb_augmentations" in transformations_cfg and\
                 isinstance(transformations_cfg.rgb_augmentations, ListConfig):
-                self._rgb_augmentations = self._set_transformations(
+                self._rgb_augmentations = GSODataModule._set_transformations(
                     transformations_cfg.rgb_augmentations,
                     p=transformations_cfg.augmentations_p,
                 )
@@ -110,7 +110,7 @@ class GSODataModule(LightningDataModule):
             # Depth augmentations
             if "depth_augmentations" in transformations_cfg and\
                 isinstance(transformations_cfg.depth_augmentations, ListConfig):
-                self._depth_augmentations = self._set_transformations(
+                self._depth_augmentations = GSODataModule._set_transformations(
                     transformations_cfg.depth_augmentations,
                     p=transformations_cfg.augmentations_p,
                 )
@@ -118,7 +118,7 @@ class GSODataModule(LightningDataModule):
             # Background augmentations
             if "background_augmentations" in transformations_cfg and\
                 isinstance(transformations_cfg.background_augmentations, ListConfig):
-                self._background_augmentations = self._set_transformations(
+                self._background_augmentations = GSODataModule._set_transformations(
                     transformations_cfg.background_augmentations,
                     p=transformations_cfg.augmentations_p,
                 )
@@ -159,7 +159,7 @@ class GSODataModule(LightningDataModule):
         # Load and split datasets only if not loaded already
         if not self._data_train and not self._data_val and not self._data_test:
             
-            # Create an iterable scene set from (a/multiple) scene set(s)
+            # Create an iterable scene set from [a/multiple] scene set(s)
             scene_set_train = make_iterable_scene_set(
                 **self.hparams.scene_set_cfg,
             )
@@ -186,7 +186,7 @@ class GSODataModule(LightningDataModule):
         """
         return DataLoader(
             dataset=self._data_train,
-            collate_fn=self._data_train.collate_fn,
+            collate_fn=ObjectSegmentationDataset.collate_fn,
             # worker_init_fn=worker_init_fn,
             **self.hparams.dataloader_cfg,
         )

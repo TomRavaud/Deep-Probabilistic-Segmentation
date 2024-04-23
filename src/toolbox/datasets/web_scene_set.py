@@ -55,9 +55,17 @@ class WebSceneSet(SceneSet):
             load_segmentation=load_segmentation,
         )
 
+    # NOTE: I could add a skip_shards parameter to split the set into train, validation
+    # and test sets. SHARD LEVEL SPLITTING.
     def get_tar_list(self) -> List[str]:
+        """Get the list of tar files in the dataset directory.
+
+        Returns:
+            List[str]: List of tar files.
+        """
         tar_files = [str(x) for x in self.wds_dir.iterdir() if x.suffix == ".tar"]
         tar_files.sort()
+        
         return tar_files
 
     # def __getitem__(self, idx: int) -> SceneObservation:
@@ -83,6 +91,7 @@ def load_scene_ds_obs(
     load_depth: bool = False,
     label_format: str = "{label}",
 ) -> SceneObservation:
+    
     assert isinstance(sample["rgb.png"], bytes)
     assert isinstance(sample["segmentation.png"], bytes)
     assert isinstance(sample["depth.png"], bytes)
@@ -116,7 +125,20 @@ def load_scene_ds_obs(
     )
 
 class IterableWebSceneSet(IterableSceneSet):
-    def __init__(self, web_scene_set: WebSceneSet, buffer_size: int = 1):
+    """
+    Iterable scene set for webdataset format.
+    """
+    def __init__(self, web_scene_set: WebSceneSet, buffer_size: int = 1) -> None:
+        """Constructor.
+
+        Args:
+            web_scene_set (WebSceneSet): The web scene set.
+            buffer_size (int, optional): Number of samples to buffer in memory
+                before shuffling. Defaults to 1.
+
+        Yields:
+            Iterator: Iterator over SceneObservation objects.
+        """
         self.web_scene_set = web_scene_set
 
         load_scene_ds_obs_ = partial(
@@ -132,12 +154,25 @@ class IterableWebSceneSet(IterableSceneSet):
             for sample in samples:
                 yield load_scene_ds_obs_(sample)
 
+        # Create the webdataset Pipeline (wds.Dataset is a shorthand for writing down
+        # pipelines, but the underlying pipeline is an instance of wds.DataPipeline)
         self.datapipeline = wds.DataPipeline(
+            # Sample from the shards
             wds.ResampledShards(self.web_scene_set.get_tar_list()),
+            
+            # FIXME: Should we split by worker here? cf webdataset github
+            # wds.split_by_worker,
+            
+            # Extract samples from the tar file
             tarfile_to_samples(),
+            
+            # Convert a sample to a SceneObservation
             load_scene_ds_obs_iterator,
+            
+            # Shuffle the samples
             wds.shuffle(buffer_size),
         )
+        # print("Shards: ", self.web_scene_set.get_tar_list())
 
     def __iter__(self):
         return iter(self.datapipeline)

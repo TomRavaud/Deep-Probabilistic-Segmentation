@@ -23,15 +23,31 @@ object_set_cfg:
 # Scene set(s)
 scene_set_cfg:
   dir: ${paths.data_dir}
+
+  # Set a buffer size > 1 to allow approximate shuffling of the samples
+  sample_buffer_size: 200
+
+  # List of scene sets configurations
   sets_cfg:
     - name: webdataset.gso_1M
-      n_repeats: 1
+      n_repeats: 1  # Number of times to repeat the set
 
 # Dataset parameters
 dataset_cfg:
+
+  # Minimum area of the modal bounding box of an object to be
+  # considered as a valid object
   min_area: null
+
+  # Whether to choose the first valid object in the scene or a
+  # random one
   return_first_object: False
+
+  # Set of labels of valid objects
   keep_labels_set: null
+
+  # Maximum number of observations in which we look for a valid object
+  # before raising an exception
   valid_data_max_attempts: 200
 
 # Dataloader parameters
@@ -41,7 +57,8 @@ dataloader_cfg:
   pin_memory: False
   persistent_workers: True
 
-# Parameters for the data transforms (e.g., normalization, resizing, augmentation, etc.)
+# Parameters for the data transforms (e.g., normalization, resizing,
+# augmentation, etc.)
 transformations_cfg:
 
   # Resize the images to the specified size
@@ -51,7 +68,7 @@ transformations_cfg:
   augmentations_p: 0.8
 
   # Override the default background augmentations
-  background_augmentations:
+  background_augmentations: null
   
   # Override the default depth augmentations
-  depth_augmentations:
+  depth_augmentations: null

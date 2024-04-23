@@ -108,6 +108,9 @@ def make_iterable_scene_set(
 
     Returns:
         IterableMultiSceneSet: The iterable set.
+    
+    Raises:
+        ValueError: If the scene set type is unknown.
     """
     path = Path(dir)
     
@@ -116,22 +119,29 @@ def make_iterable_scene_set(
     
     for this_set_config in sets_cfg:
         
+        # Create the SceneSet
         scene_set = make_scene_set(
             this_set_config.name,
             load_depth=input_depth,
             set_path=path,
         )
+        
+        # Convert the SceneSet into an IterableSceneSet
         if isinstance(scene_set, WebSceneSet):
             assert not deterministic
             iterator: IterableSceneSet = IterableWebSceneSet(
                 scene_set,
                 buffer_size=sample_buffer_size,
             )
-        else:
-            assert isinstance(scene_set, SceneSet)
+        elif isinstance(scene_set, SceneSet):
             iterator = RandomIterableSceneSet(scene_set, deterministic=deterministic)
+        else:
+            raise ValueError(f"Unknown scene set type: {type(scene_set)}")
         
+        # Repeat the set multiple times if needed and add it to the list
+        # of scene sets
         for _ in range(this_set_config.n_repeats):
             scene_set_iterators.append(iterator)
     
+    # Gather all the scene sets into a single IterableMultiSceneSet
     return IterableMultiSceneSet(scene_set_iterators)

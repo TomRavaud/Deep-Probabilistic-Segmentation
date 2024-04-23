@@ -69,8 +69,14 @@ class ObjectData:
     label: str
     TWO: Optional[Transform] = None
     unique_id: Optional[int] = None
+    
+    # Amodal means the bounding box of the entire object, including the parts
+    # that are occluded
     bbox_amodal: Optional[np.ndarray] = None  # (4, ) array [xmin, ymin, xmax, ymax]
+    
+    # Modal means the bounding box of the visible parts of the object only
     bbox_modal: Optional[np.ndarray] = None  # (4, ) array [xmin, ymin, xmax, ymax]
+    
     visib_fract: Optional[float] = None
     TWO_init: Optional[Transform] = None
     # Some pose estimation datasets (ModelNet) provide an initial pose estimate
@@ -241,8 +247,6 @@ class SceneObservation:
                 im_infos: List[dict]
                 gt_detections: SceneObservationTensorCollection
                 gt_data: SceneObservationTensorCollection
-
-
         """
         if object_labels is not None:
             object_labels = set(object_labels)
@@ -483,6 +487,13 @@ class RandomIterableSceneSet(IterableSceneSet):
         self.worker_seed_fn = wds.utils.pytorch_worker_seed
 
     def __iter__(self) -> Iterator[SceneObservation]:
+        """Iterate over the scene set. A sample is randomly selected among the
+        entire scene set at each iteration, converted to SceneObservation and
+        yielded.
+
+        Yields:
+            Iterator[SceneObservation]: An iterator over the scene set.
+        """
         if self.deterministic:
             seed = make_seed(self.worker_seed_fn())
         else:
@@ -493,6 +504,7 @@ class RandomIterableSceneSet(IterableSceneSet):
                 os.urandom(4),
             )
         self.rng = random.Random(seed)
+        
         while True:
             idx = self.rng.randint(0, len(self.scene_set) - 1)
             yield self.scene_set[idx]

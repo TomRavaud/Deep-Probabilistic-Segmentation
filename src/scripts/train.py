@@ -10,6 +10,8 @@ import hydra
 from omegaconf import DictConfig
 from lightning import LightningDataModule
 
+import cv2
+
 
 def train(cfg: DictConfig):
     """Perform training.
@@ -34,7 +36,27 @@ def train(cfg: DictConfig):
           batch.bboxes.shape,
           batch.TCO.shape,
           batch.K.shape,
-          batch.depths)
+          batch.depths,
+          "\n")
+    
+    # Visualize the data
+    for i in range(cfg.data.dataloader_cfg.batch_size):
+        
+        print(batch.object_datas[i].label)
+        
+        # Get the image
+        img = batch.rgbs[i].permute(1, 2, 0).numpy()
+        
+        # Image to BGR
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        
+        # Draw the bounding box
+        bbox = batch.bboxes[i].numpy()
+        bbox = bbox.astype(int)
+        cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
+        
+        cv2.imshow("Image", img)
+        cv2.waitKey(0)
 
     
 
