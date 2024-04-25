@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - data: gso
-  - model: null
+  - model: default
   - callbacks: null
   - logger: null
   - trainer: null
@@ -12,3 +12,6 @@ defaults:
 
 # Task name, determines output directory path
 task_name: "train"
+
+# If true, the model will be trained
+train: True

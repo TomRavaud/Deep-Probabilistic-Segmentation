@@ -8,12 +8,8 @@ from torch.utils.data import DataLoader, Dataset
 from omegaconf import DictConfig, ListConfig
 
 # Custom modules
-from toolbox.datasets.object_set import RigidObjectSet
 from toolbox.datasets.segmentation_dataset import ObjectSegmentationDataset
-from toolbox.datasets.make_sets import (
-    make_object_set,
-    make_iterable_scene_set,
-)
+from toolbox.datasets.make_sets import make_iterable_scene_set
 import toolbox.datasets.transformations as transformations
 
 
@@ -59,7 +55,6 @@ class GSODataModule(LightningDataModule):
     """  
     def __init__(
         self,
-        object_set_cfg: Optional[DictConfig] = None,
         scene_set_cfg: Optional[DictConfig] = None,
         dataset_cfg: Optional[DictConfig] = None,
         dataloader_cfg: Optional[DictConfig] = None,
@@ -123,9 +118,6 @@ class GSODataModule(LightningDataModule):
                     p=transformations_cfg.augmentations_p,
                 )
         
-        # Variable to store the object set
-        self._object_set: Optional[RigidObjectSet] = None
-    
         # Variables to store the datasets
         self._data_train: Optional[Dataset] = None
         self._data_val: Optional[Dataset] = None
@@ -153,9 +145,6 @@ class GSODataModule(LightningDataModule):
         :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or
             `"predict"`. Defaults to ``None``.
         """
-        # Create the set of objects
-        self._object_set = make_object_set(**self.hparams.object_set_cfg)
-
         # Load and split datasets only if not loaded already
         if not self._data_train and not self._data_val and not self._data_test:
             

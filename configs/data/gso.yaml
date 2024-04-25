@@ -14,12 +14,6 @@ _target_: datamodules.gso_datamodule.GSODataModule
 # Parameters that are passed to the LightningDataModule #
 #-------------------------------------------------------#
 
-# Object set
-object_set_cfg:
-  # Directory and name of the object set (3D models to render)
-  dir: ${paths.data_dir}/google_scanned_objects
-  name: gso.normalized
-
 # Scene set(s)
 scene_set_cfg:
   dir: ${paths.data_dir}

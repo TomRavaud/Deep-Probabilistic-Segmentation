@@ -1,0 +1,28 @@
+_target_: models.object_segmentation_module.ObjectSegmentationLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+model:
+  _target_: models.components.object_segmentation_model.ObjectSegmentationModel
+
+  # Object set
+  object_set_cfg:
+    # Directory and name of the object set (3D models to render)
+    dir: ${paths.data_dir}/google_scanned_objects
+    name: gso.normalized
+
+
+
+# Compile model for faster training with pytorch 2.0
+compile: false

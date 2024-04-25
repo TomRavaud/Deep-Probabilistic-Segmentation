@@ -1,4 +1,4 @@
-name: deepseg
+name: deepseg2
 
 channels:
   - conda-forge
@@ -26,3 +26,6 @@ dependencies:
     - pandas==2.2.2
     - pin==2.7.0
     - imageio==2.34.0
+    - timm==0.9.10
+    - torchinfo==1.8.0
+    - git+https://github.com/ChaoningZhang/MobileSAM.git
