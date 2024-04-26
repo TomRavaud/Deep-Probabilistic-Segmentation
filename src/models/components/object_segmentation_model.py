@@ -1,10 +1,10 @@
 # Standard libraries
-from typing import Optional
+from typing import Optional, Tuple
 
 # Third-party libraries
 import torch
 from torch import nn
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
@@ -28,6 +28,7 @@ class ObjectSegmentationModel(nn.Module):
     """
     def __init__(
         self,
+        image_size: ListConfig,
         object_set_cfg: Optional[DictConfig] = None,
     ) -> None:
         """
@@ -38,23 +39,26 @@ class ObjectSegmentationModel(nn.Module):
         # Create the set of objects
         object_set = make_object_set(**object_set_cfg)
         
+        image_size = tuple(image_size)
+        
         # Instantiate the contour rendering module
         # (for rendering 3D objects, and extracting points along objects contour)
         self._contour_rendering = ContourRendering(
             object_set=object_set,
+            image_size=image_size,
         )
 
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
-        self._mobile_sam = MobileSAM()
+        # self._mobile_sam = MobileSAM()
         
         # Instantiate the ResNet18 module
         # (for implicit object segmentation prediction)
-        self._resnet18 = ResNet18()
+        # self._resnet18 = ResNet18()
         
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
-        self._segmentation_mask = SegmentationMask()
+        # self._segmentation_mask = SegmentationMask()
 
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:

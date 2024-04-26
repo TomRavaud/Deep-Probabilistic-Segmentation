@@ -21,6 +21,8 @@ model:
     # Directory and name of the object set (3D models to render)
     dir: ${paths.data_dir}/google_scanned_objects
     name: gso.normalized
+  
+  image_size: ${data.transformations_cfg.resize}
 
 
 

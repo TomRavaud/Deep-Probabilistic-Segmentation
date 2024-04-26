@@ -31,11 +31,6 @@ class RigidObject:
                 formats.
             mesh_diameter (Optional[float], optional): Diameter of the object, expressed
                 in the unit of the meshes. Defaults to None.
-            mesh_units (str, optional): Units in which the vertex positions are
-                expressed. Can be "m" or "mm", defaults to "m". In the operations of
-                this codebase, all mesh coordinates and poses must be expressed in
-                meters. When an object is loaded, a scaling will be applied to the mesh
-                to ensure its coordinates are in meters when in memory. Defaults to "m".
             scaling_factor_mesh_units_to_meters (float, optional): Scale that converts
                 mesh units to meters. Defaults to 1.0.
             scaling_factor (float, optional): An extra scaling factor that can be
@@ -52,6 +47,15 @@ class RigidObject:
         self._scaling_factor = scaling_factor
         self._mesh_diameter = mesh_diameter
         self._ypr_offset_deg = ypr_offset_deg
+    
+    @property
+    def label(self) -> str:
+        """Returns the label of the object.
+
+        Returns:
+            str: The label of the object.
+        """
+        return self._label
 
     @property
     def scale(self) -> float:
@@ -62,6 +66,15 @@ class RigidObject:
             float: The scale factor.
         """
         return self._scaling_factor_mesh_units_to_meters * self._scaling_factor
+    
+    @property
+    def mesh_path(self) -> Path:
+        """Returns the path to the mesh.
+
+        Returns:
+            Path: The path to the mesh.
+        """
+        return self._mesh_path
 
 
 class RigidObjectSet:
@@ -87,6 +100,13 @@ class RigidObjectSet:
         # Check for duplicate labels
         if len(self._labels_to_objects) != len(objects):
             raise RuntimeError("There are objects with duplicate labels.")
+        
+        # Define a common scale if all objects share the same scaling factor
+        self._common_scale = objects[0].scale
+        for obj in objects:
+            if obj.scale != self._common_scale:
+                self._common_scale = None
+                break
         
     def __getitem__(self, id: Union[int, str]) -> RigidObject:
         """Returns an object by its index or label.
@@ -123,13 +143,25 @@ class RigidObjectSet:
             List[RigidObject]: The list of objects.
         """
         return self._objects
-
-    def filter_objects(self, keep_labels: Set[str]):
+    
+    @property
+    def scale(self) -> float:
+        """
+        Scale factor that converts the meshes to desired units.
+        
+        Returns:
+            float: The scale factor.
+        """
+        return self._common_scale
+    
+    def filter_objects(self, keep_labels: Set[str]) -> RigidObjectSet:
         """Filters the objects by keeping only the objects with the specified labels.
 
         Args:
             keep_labels (Set[str]): The labels of the objects to keep.
+
+        Returns:
+            RigidObjectSet: A new object set with the filtered objects.
         """
-        self._objects = [obj for obj in self._objects if obj.label in keep_labels]
-        # Update the labels to objects mapping
-        self._labels_to_objects = {obj.label: obj for obj in self._objects}
+        objects_to_keep = [obj for obj in self._objects if obj.label in keep_labels]
+        return RigidObjectSet(objects_to_keep)

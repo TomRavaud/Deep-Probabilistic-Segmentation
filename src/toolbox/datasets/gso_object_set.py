@@ -23,7 +23,7 @@ class GoogleScannedObjectSet(RigidObjectSet):
 
         # Set the scaling factor based on the split
         if split == "orig":
-            scaling_factor = 1.0
+            scaling_factor = 30.0
         elif split in {"normalized", "pointcloud"}:
             scaling_factor = 0.1
 

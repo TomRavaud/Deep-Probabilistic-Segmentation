@@ -61,6 +61,8 @@ transformations_cfg:
   # Probability of applying the augmentations
   augmentations_p: 0.8
 
+  rgb_augmentations: null
+
   # Override the default background augmentations
   background_augmentations: null
   

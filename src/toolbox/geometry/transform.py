@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Standard Library
 from typing import Tuple, Union
 
@@ -94,19 +96,19 @@ class Transform:
     def __eq__(self, other) -> str:
         return self._T.__eq__(other._T)
 
-    def __mul__(self, other: "Transform") -> "Transform":
+    def __mul__(self, other: Transform) -> Transform:
         T = self._T * other._T
         return Transform(T)
 
-    def inverse(self) -> "Transform":
+    def inverse(self) -> Transform:
         return Transform(self._T.inverse())
 
     def toHomogeneousMatrix(self) -> np.ndarray:
-        return self._T.homogeneous
+        return self._T.homogeneous.astype(np.float32)
 
     @property
     def translation(self) -> np.ndarray:
-        return self._T.translation.reshape(3)
+        return self._T.translation.reshape(3).astype(np.float32)
 
     @property
     def quaternion(self) -> pin.Quaternion:
@@ -115,12 +117,12 @@ class Transform:
     @property
     def matrix(self) -> np.ndarray:
         """Returns 4x4 homogeneous matrix representations."""
-        return self._T.homogeneous
+        return self._T.homogeneous.astype(np.float32)
 
     @property
     def tensor(self) -> np.ndarray:
         """Returns 4x4 homogeneous matrix representations."""
-        return torch.tensor(self._T.homogeneous)
+        return torch.tensor(self._T.homogeneous, dtype=torch.float32)
 
     @staticmethod
     def Identity():

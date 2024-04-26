@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # Standard libraries
-from typing import List, Optional, Union, Set, Iterator
+from typing import List, Optional, Union, Set, Iterator, Tuple
 import time
 from dataclasses import dataclass, replace
 import random
@@ -71,6 +71,24 @@ class BatchSegmentationData:
             self.depths = self.depths.pin_memory()
         
         return self
+    
+    @property
+    def batch_size(self) -> int:
+        """Get the batch size.
+
+        Returns:
+            int: Batch size.
+        """
+        return self.rgbs.size(0)
+
+    @property
+    def image_size(self) -> Tuple[int, int]:
+        """Get the image size.
+
+        Returns:
+            Tuple[int, int]: Image size.
+        """
+        return self.rgbs.size(2), self.rgbs.size(3)
 
 
 class ObjectSegmentationDataset(torch.utils.data.IterableDataset):

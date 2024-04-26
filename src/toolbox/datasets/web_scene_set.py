@@ -109,6 +109,7 @@ def load_scene_ds_obs(
 
     object_datas_json: List[DataJsonType] = json.loads(sample["object_datas.json"])
     object_datas = [ObjectData.from_json(d) for d in object_datas_json]
+    
     for obj in object_datas:
         obj.label = label_format.format(label=obj.label)
 

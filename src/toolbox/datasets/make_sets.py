@@ -37,10 +37,10 @@ def make_object_set(name: str, dir: str) -> RigidObjectSet:
     # GSO models
     if name == "gso.orig":
         objset = GoogleScannedObjectSet(path, split="orig")
+        raise NotImplementedError("Original GSO models need to be centered and "
+                                  "normalized before being used. Not supported yet.")
     elif name == "gso.normalized":
         objset = GoogleScannedObjectSet(path, split="normalized")
-    elif name == "gso.panda3d":
-        objset = GoogleScannedObjectSet(path, split="panda3d")
     else:
         raise ValueError(f"Unknown object set name: {name}")
     
