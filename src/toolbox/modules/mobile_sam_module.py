@@ -1,11 +1,17 @@
+# Standard libraries
+from typing import Tuple
+
 # Third-party libraries
 import torch
 import torch.nn as nn
-from mobile_sam import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
+from mobile_sam import sam_model_registry, SamPredictor
 from mobile_sam.utils.transforms import ResizeLongestSide
 
 import numpy as np
 import cv2
+
+# Custom modules
+from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 
 
 class MobileSAM(nn.Module):
@@ -13,10 +19,17 @@ class MobileSAM(nn.Module):
     Module that uses the MobileSAM model to predict masks.
     """
     def __init__(self):
-        pass
+        
+        super().__init__()
     
-    def forward(self):
-        pass
+    def forward(
+        self,
+        x: BatchSegmentationData,
+        contour_points: Tuple,
+        hierarchy: np.ndarray,
+    ) -> torch.Tensor:
+        
+        return
 
 
 if __name__ == "__main__":

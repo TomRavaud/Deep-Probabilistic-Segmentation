@@ -50,7 +50,7 @@ class ObjectSegmentationModel(nn.Module):
 
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
-        # self._mobile_sam = MobileSAM()
+        self._mobile_sam = MobileSAM()
         
         # Instantiate the ResNet18 module
         # (for implicit object segmentation prediction)
@@ -72,9 +72,12 @@ class ObjectSegmentationModel(nn.Module):
         """
         # TODO: contour rendering forward pass should not take the full batch
         # segmentation data as input, but only the necessary data
-        self._contour_rendering(x)
+        contour_points, hierarchy = self._contour_rendering(x)
         
-        # TODO: call the other modules
+        # TODO: do not use the full batch data as input
+        # MobileSAM
+        mask = self._mobile_sam(x, contour_points, hierarchy)
+        
         
         return x
 
