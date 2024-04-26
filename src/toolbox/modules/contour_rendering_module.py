@@ -80,6 +80,7 @@ class ContourRendering(nn.Module):
     
     # TODO: change input to contain only the necessary data and the output to be more
     # explicit
+    @torch.no_grad()
     def forward(self, x: BatchSegmentationData) -> Tuple[Tuple, np.ndarray]:
         
         # Create the set of labels to filter the objects
@@ -147,57 +148,56 @@ class ContourRendering(nn.Module):
         contour_points, hierarchy = ContourRendering._generate_valid_contour(
             mask,
         )
-        print("Hierarchy:", hierarchy)
-        
         
         ###########################################################################
         # Debugging
         ###########################################################################
-        print("Name of the object:", x.object_datas[0].label)
+        # print("Hierarchy:", hierarchy)
+        # print("Name of the object:", x.object_datas[0].label)
         
-        plt.figure()
-        plt.imshow(depth_map.squeeze().cpu().numpy())
+        # plt.figure()
+        # plt.imshow(depth_map.squeeze().cpu().numpy())
         
-        # Get the bounding box
-        bbox = x.bboxes[0].numpy()
-        bbox = bbox.astype(int)
+        # # Get the bounding box
+        # bbox = x.bboxes[0].numpy()
+        # bbox = bbox.astype(int)
         
-        rect = patches.Rectangle(
-            (bbox[0], bbox[1]),
-            bbox[2] - bbox[0],
-            bbox[3] - bbox[1],
-            linewidth=2,
-            edgecolor='m',
-            facecolor='none',
-        )
+        # rect = patches.Rectangle(
+        #     (bbox[0], bbox[1]),
+        #     bbox[2] - bbox[0],
+        #     bbox[3] - bbox[1],
+        #     linewidth=2,
+        #     edgecolor='m',
+        #     facecolor='none',
+        # )
         
-        _, ax = plt.subplots()
+        # _, ax = plt.subplots()
         
-        ax.imshow(x.rgbs[0].permute(1, 2, 0).cpu().numpy())
-        ax.add_patch(rect)
+        # ax.imshow(x.rgbs[0].permute(1, 2, 0).cpu().numpy())
+        # ax.add_patch(rect)
         
-        # Mask the image
-        plt.imshow(mask, alpha=0.3)
+        # # Mask the image
+        # plt.imshow(mask, alpha=0.3)
         
-        plt.show()
+        # plt.show()
         
         
-        # Draw the contours
-        contour = contour_points[0]
-        mask = mask.astype(np.uint8)
-        mask *= 255
+        # # Draw the contours
+        # contour = contour_points[0]
+        # mask = mask.astype(np.uint8)
+        # mask *= 255
         
-        cv2.drawContours(
-            image=mask,
-            contours=[contour],
-            contourIdx=-1,
-            color=120,
-            thickness=5,
-        )
+        # cv2.drawContours(
+        #     image=mask,
+        #     contours=[contour],
+        #     contourIdx=-1,
+        #     color=120,
+        #     thickness=5,
+        # )
         
-        # Visualize the mask
-        cv2.imshow("Mask", mask)
-        cv2.waitKey(0)
+        # # Visualize the mask
+        # cv2.imshow("Mask", mask)
+        # cv2.waitKey(0)
         ###########################################################################
         
         return contour_points, hierarchy
