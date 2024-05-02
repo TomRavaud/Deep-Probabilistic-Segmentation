@@ -31,7 +31,7 @@ dataset_cfg:
 
   # Minimum area of the modal bounding box of an object to be
   # considered as a valid object
-  min_area: null
+  min_area: 10000
 
   # Whether to choose the first valid object in the scene or a
   # random one
@@ -47,8 +47,8 @@ dataset_cfg:
 # Dataloader parameters
 dataloader_cfg:
   batch_size: 16
-  num_workers: 2
-  pin_memory: False
+  num_workers: 8
+  pin_memory: True
   persistent_workers: True
 
 # Parameters for the data transforms (e.g., normalization, resizing,

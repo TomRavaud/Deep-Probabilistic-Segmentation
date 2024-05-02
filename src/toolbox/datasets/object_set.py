@@ -75,6 +75,15 @@ class RigidObject:
             Path: The path to the mesh.
         """
         return self._mesh_path
+    
+    @property
+    def mesh_diameter(self) -> Optional[float]:
+        """Returns the diameter of the object.
+
+        Returns:
+            Optional[float]: The diameter of the object.
+        """
+        return self._mesh_diameter
 
 
 class RigidObjectSet:
@@ -153,6 +162,17 @@ class RigidObjectSet:
             float: The scale factor.
         """
         return self._common_scale
+    
+    def get_id_from_label(self, label: str) -> int:
+        """Returns the index of an object by its label.
+
+        Args:
+            label (str): The label of the object.
+
+        Returns:
+            int: The index of the object.
+        """
+        return self._objects.index(self._labels_to_objects[label])
     
     def filter_objects(self, keep_labels: Set[str]) -> RigidObjectSet:
         """Filters the objects by keeping only the objects with the specified labels.

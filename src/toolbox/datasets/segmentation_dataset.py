@@ -9,6 +9,7 @@ import random
 # Third-party libraries
 import torch
 import numpy as np
+import cv2
 
 # Custom modules
 from toolbox.datasets.transformations import SceneObservationTransform
@@ -26,6 +27,7 @@ class SegmentationData:
     Data corresponding to a dataset sample.
     
     rgb: (h, w, 3) uint8
+    object_data: ObjectData
     depth: (bsz, h, w) float32
     bbox: (4, ) int
     K: (3, 3) float32
@@ -34,6 +36,7 @@ class SegmentationData:
     rgb: np.ndarray
     bbox: np.ndarray
     TCO: np.ndarray
+    DTO: np.ndarray
     K: np.ndarray
     depth: Optional[np.ndarray]
     object_data: ObjectData
@@ -46,6 +49,7 @@ class BatchSegmentationData:
     A batch of segmentation data.
 
     rgbs: (bsz, 3, h, w) uint8
+    object_datas: List[ObjectData]
     depths: (bsz, h, w) float32
     bboxes: (bsz, 4) int
     TCO: (bsz, 4, 4) float32
@@ -55,13 +59,16 @@ class BatchSegmentationData:
     object_datas: List[ObjectData]
     bboxes: torch.Tensor
     TCO: torch.Tensor
+    DTO: torch.Tensor
     K: torch.Tensor
     depths: Optional[torch.Tensor] = None
 
     def pin_memory(self) -> BatchSegmentationData:
-        #NOTE: is this function called when using a DataLoader with pin_memory=True?
-        print("Pin memory")
-        
+        """Pin memory for the batch.
+
+        Returns:
+            BatchSegmentationData: Batch with pinned memory.
+        """
         self.rgbs = self.rgbs.pin_memory()
         self.bboxes = self.bboxes.pin_memory()
         self.TCO = self.TCO.pin_memory()
@@ -170,6 +177,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             bboxes=torch.from_numpy(np.stack([d.bbox for d in list_data])),
             K=torch.from_numpy(np.stack([d.K for d in list_data])),
             TCO=torch.from_numpy(np.stack([d.TCO for d in list_data])),
+            DTO=torch.from_numpy(np.stack([d.DTO for d in list_data])),
             object_datas=[d.object_data for d in list_data],
         )
 
@@ -213,6 +221,94 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         new_obs = replace(obs, object_datas=visib_object_datas)
         
         return new_obs
+    
+    @staticmethod
+    def _sample_random_pose_perturbation(
+        bbox: np.ndarray,
+        K: np.ndarray,
+        Z: float,
+        xy_translation: bool = True,
+        xy_translation_scale: float = 0.3,
+        z_translation: bool = True,
+        z_translation_scale: float = 0.3,
+        rotation: bool = True,
+        rotation_scale: float = 20.0,
+    ) -> np.ndarray:
+        """Sample a random pose perturbation with respect to the camera frame.
+
+        Args:
+            bbox (np.ndarray): Bounding box of the object in the image (modal bbox).
+            K (np.ndarray): Camera intrinsic matrix.
+            Z (float): Depth of the object in the camera frame.
+            xy_translation (bool, optional): Whether to sample a random XY translation.
+                Defaults to True.
+            xy_translation_scale (float, optional): Relative scale of the XY translation
+                (radius of the circle, no units). Defaults to 0.3.
+            z_translation (bool, optional): Whether to sample a random Z translation.
+                Defaults to True.
+            z_translation_scale (float, optional): Relative scale of the Z translation
+                (no units). Defaults to 0.3.
+            rotation (bool, optional): Whether to sample a random rotation. Defaults to
+                True.
+            rotation_scale (float, optional): Absolute scale of the rotation (degrees).
+                Defaults to 20.
+
+        Returns:
+            np.ndarray: Random pose perturbation represented as a transform matrix.
+        """
+        DR = np.eye(3)
+        Dt = np.zeros(3)
+        
+        # Get the intrinsic parameters of the camera
+        f, cx, cy = K[0, 0], K[0, 2], K[1, 2]
+        
+        # Compute the 3D coordinates of the bounding box corners in the camera frame
+        X1 = Z/f * (bbox[0] - cx)
+        X2 = Z/f * (bbox[2] - cx)
+        Y1 = Z/f * (bbox[1] - cy)
+        Y2 = Z/f * (bbox[3] - cy)
+        
+        # XY translation (in-plane translation)
+        if xy_translation:
+            # Random perturbation (uniform distribution in a circle of radius
+            # xy_translation_scale
+            x_scale = xy_translation_scale * (X2 - X1)
+            Dx = random.uniform(-x_scale, x_scale)
+            y_scale = xy_translation_scale * (Y2 - Y1)
+            Dy = random.uniform(-y_scale, y_scale)
+            Dt[0] = Dx
+            Dt[1] = Dy
+
+        # Z translation (scale)
+        if z_translation:
+            # Random perturbation
+            z_scale = z_translation_scale * np.min([X2 - X1, Y2 - Y1])
+            Dz = random.uniform(-z_scale, z_scale)
+            Dt[2] = Dz
+
+        # Rotation
+        if rotation:
+            # Random angle
+            perturbation = random.uniform(-rotation_scale, rotation_scale)
+            perturbation_rad = perturbation * np.pi / 180
+            # Random axis (unit vector)
+            axis = np.random.rand(3)
+            axis /= np.linalg.norm(axis)
+            DR = cv2.Rodrigues(perturbation_rad * axis)[0]
+            
+            # 20 degrees rotation around Z axis
+            theta = 90 * np.pi / 180
+            DR = np.array([[np.cos(theta), -np.sin(theta), 0],
+                           [np.sin(theta), np.cos(theta), 0],
+                            [0, 0, 1]])
+        
+        # Transform matrix
+        DT = np.eye(4, dtype=np.float32)
+        DT[:3, :3] = DR
+        DT[:3, 3] = Dt
+        
+        return DT
+        
     
     def _make_data_from_obs(
         self,
@@ -320,13 +416,24 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         assert obs.camera_data.TWC is not None
         assert object_data.TWO is not None
         
+        TCO = (obs.camera_data.TWC.inverse() * object_data.TWO).matrix
+        DTO = ObjectSegmentationDataset._sample_random_pose_perturbation(
+            bbox=object_data.bbox_modal,
+            K=obs.camera_data.K,
+            Z=TCO[2, 3],
+            xy_translation=True,
+            z_translation=True,
+            rotation=False,
+        )
+        
         # Add depth to SegmentationData
         data = SegmentationData(
             rgb=obs.rgb,
             depth=obs.depth if obs.depth is not None else None,
             bbox=object_data.bbox_modal,
             K=obs.camera_data.K,
-            TCO=(obs.camera_data.TWC.inverse() * object_data.TWO).matrix,
+            TCO=TCO,
+            DTO=DTO,
             object_data=object_data,
         )
         

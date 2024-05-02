@@ -70,13 +70,10 @@ class ObjectSegmentationModel(nn.Module):
         Returns:
             torch.Tensor: A tensor of predictions.
         """
-        # TODO: contour rendering forward pass should not take the full batch
-        # segmentation data as input, but only the necessary data
-        contour_points, hierarchy = self._contour_rendering(x)
+        # Render objects of the batch, extract outer contours points
+        contour_points_list = self._contour_rendering(x)
         
-        # TODO: do not use the full batch data as input
-        # MobileSAM
-        mask = self._mobile_sam(x, contour_points, hierarchy)
+        mask = self._mobile_sam(x, contour_points_list)
         
         
         return x

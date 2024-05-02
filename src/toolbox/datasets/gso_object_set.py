@@ -42,6 +42,7 @@ class GoogleScannedObjectSet(RigidObjectSet):
                 label=label,
                 mesh_path=model_path,
                 scaling_factor=scaling_factor,
+                mesh_diameter=1.0,
             )
             objects.append(obj)
         
