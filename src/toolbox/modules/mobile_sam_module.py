@@ -4,7 +4,7 @@ from typing import Tuple
 # Third-party libraries
 import torch
 import torch.nn as nn
-from mobile_sam import sam_model_registry, SamPredictor
+from mobile_sam import sam_model_registry
 from mobile_sam.utils.transforms import ResizeLongestSide
 
 import numpy as np
@@ -36,9 +36,6 @@ class MobileSAM(nn.Module):
         self._mobile_sam.to(device=device)
         self._mobile_sam.eval()
         
-        # Create the SAM predictor
-        # self._predictor = SamPredictor(self._mobile_sam)
-    
     @staticmethod
     def _get_bboxes_from_contours(contours: list) -> torch.Tensor:
         """Compute the bounding box from a list of contours
@@ -117,56 +114,56 @@ class MobileSAM(nn.Module):
         ]
         
         # Get the predictions from the MobileSAM model
-        batched_output = self._mobile_sam(batched_input, multimask_output=True)
+        batched_output = self._mobile_sam(batched_input, multimask_output=False)
         
         
         ###########################################################################
         # Debugging
         ########################################################################### 
         
-        # Copy the image for visualization
-        img_original = img.permute(1, 2, 0).cpu().numpy()
-        img_to_display = img_original.copy()
+        # # Copy the image for visualization
+        # img_original = img.permute(1, 2, 0).cpu().numpy()
+        # img_to_display = img_original.copy()
         
-        # RGB to BGR
-        img_original = cv2.cvtColor(img_original, cv2.COLOR_RGB2BGR)
-        img_to_display = cv2.cvtColor(img_to_display, cv2.COLOR_RGB2BGR)
+        # # RGB to BGR
+        # img_original = cv2.cvtColor(img_original, cv2.COLOR_RGB2BGR)
+        # img_to_display = cv2.cvtColor(img_to_display, cv2.COLOR_RGB2BGR)
         
-        scores = batched_output[0]["iou_predictions"][0].cpu().numpy()
-        # logits = batched_output[0]["low_res_logits"][0].cpu().numpy()
-        masks = batched_output[0]["masks"][0].cpu().numpy()
+        # scores = batched_output[0]["iou_predictions"][0].cpu().numpy()
+        # # logits = batched_output[0]["low_res_logits"][0].cpu().numpy()
+        # masks = batched_output[0]["masks"][0].cpu().numpy()
 
         
-        print("Scores:", scores)
-        # print("Logits:", logits.shape)
+        # print("Scores:", scores)
+        # # print("Logits:", logits.shape)
         
-        bbox = MobileSAM._get_bboxes_from_contours(contour_points_list[0])
+        # bbox = MobileSAM._get_bboxes_from_contours(contour_points_list[0])
         
-        # Convert to int
-        bbox = bbox.int().cpu().numpy()
+        # # Convert to int
+        # bbox = bbox.int().cpu().numpy()
         
-        # Draw the bounding box
-        x1, y1, x2, y2 = bbox
-        cv2.rectangle(img_to_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        # # Draw the bounding box
+        # x1, y1, x2, y2 = bbox
+        # cv2.rectangle(img_to_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-        # Get the mask with the highest score
-        mask = masks[np.argmax(scores)]
+        # # Get the mask with the highest score
+        # mask = masks[np.argmax(scores)]
         
-        # Get the logits with the highest score
-        # logit = logits[np.argmax(scores)]
+        # # Get the logits with the highest score
+        # # logit = logits[np.argmax(scores)]
         
-        # Mask the original image
-        mask = mask.astype(np.uint8)*255
+        # # Mask the original image
+        # mask = mask.astype(np.uint8)*255
         
-        masked_img = cv2.bitwise_and(img_original, img_original, mask=mask)
+        # masked_img = cv2.bitwise_and(img_original, img_original, mask=mask)
 
-        cv2.imshow("Image", img_to_display)
-        # cv2.imshow("Mask", mask)
-        cv2.imshow("Masked image", masked_img)
-        cv2.waitKey(0)
+        # cv2.imshow("Image", img_to_display)
+        # # cv2.imshow("Mask", mask)
+        # cv2.imshow("Masked image", masked_img)
+        # cv2.waitKey(0)
         ###########################################################################
         
-        return
+        return batched_output
 
 
 if __name__ == "__main__":

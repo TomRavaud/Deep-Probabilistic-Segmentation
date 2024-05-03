@@ -15,13 +15,13 @@ class ResNet18(nn.Module):
     """
     def __init__(
         self,
-        nb_classes: int = 10,
+        output_dim: int = 1000,
         nb_input_channels: Optional[int] = None,
     ) -> None:
         """Initialize a pretrained `ResNet18` module.
 
         Args:
-            nb_classes (int, optional): Number of classes to predict. Defaults to 10.
+            output_dim (int, optional): Dimension of the output. Defaults to 10.
             nb_input_channels (Optional[int], optional): Number of input channels.
                 If None, the number of input channels is not fixed and can be set at
                 runtime. If not None, the number of input channels is fixed to the
@@ -54,8 +54,10 @@ class ResNet18(nn.Module):
                 bias=self._resnet18.conv1.bias,
             )
         
-        # Replace the last fully-connected layer to have nb_classes classes as output
-        self._resnet18.fc = nn.LazyLinear(nb_classes)
+        if output_dim != 1000:
+            # Replace the last fully-connected layer to have output_dim
+            # classes as output
+            self._resnet18.fc = nn.LazyLinear(output_dim)
     
     def forward(
         self,

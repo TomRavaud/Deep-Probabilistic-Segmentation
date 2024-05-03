@@ -1,9 +1,10 @@
 # Standard libraries
-from typing import Optional, Tuple
+from typing import Optional
 
 # Third-party libraries
 import torch
 from torch import nn
+from torchvision import transforms
 from omegaconf import DictConfig, ListConfig
 
 # Custom modules
@@ -41,6 +42,13 @@ class ObjectSegmentationModel(nn.Module):
         
         image_size = tuple(image_size)
         
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        self._normalize_transform = transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
+                std=[0.229, 0.224, 0.225],
+        )
+        
         # Instantiate the contour rendering module
         # (for rendering 3D objects, and extracting points along objects contour)
         self._contour_rendering = ContourRendering(
@@ -54,11 +62,14 @@ class ObjectSegmentationModel(nn.Module):
         
         # Instantiate the ResNet18 module
         # (for implicit object segmentation prediction)
-        # self._resnet18 = ResNet18()
+        self._resnet18 = ResNet18(
+            output_dim=180,  # Hue values
+            nb_input_channels=4,  # 3 RGB channels + 1 mask channel
+        ).to(device=self._device)
         
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
-        # self._segmentation_mask = SegmentationMask()
+        self._segmentation_mask = SegmentationMask()
 
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
@@ -73,11 +84,40 @@ class ObjectSegmentationModel(nn.Module):
         # Render objects of the batch, extract outer contours points
         contour_points_list = self._contour_rendering(x)
         
-        mask = self._mobile_sam(x, contour_points_list)
+        # Predict masks, scores and logits using the MobileSAM model
+        mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
         
+        # Stack the masks from the MobileSAM outputs
+        masks = torch.stack([
+            output["masks"][torch.argmax(output["iou_predictions"])]
+            for output in mobile_sam_outputs
+        ])
         
-        return x
+        # Send images and masks to the device
+        x.rgbs = x.rgbs.to(device=self._device)
+        masks = masks.to(device=self._device)
+        
+        # Range [0, 255] -> [0, 1]
+        x.rgbs = x.rgbs.to(dtype=torch.float32)
+        x.rgbs /= 255.0
+        
+        # Normalize the RGB images
+        rgbs_normalized = self._normalize_transform(x.rgbs)
+        
+        # Combine masks and RGB images
+        input_resnet = torch.cat([rgbs_normalized, masks], dim=1)
+        
+        # Predict implicit object segmentations using the ResNet18 model
+        implicit_segmentations = self._resnet18(input_resnet)
+        
+        # Generate the segmentation masks
+        segmentation_masks = self._segmentation_mask(
+            x.rgbs,
+            implicit_segmentations,
+        )
+        
+        return segmentation_masks
 
 
 if __name__ == "__main__":
-    _ = ObjectSegmentationModel()
+    pass

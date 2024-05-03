@@ -199,7 +199,7 @@ class ContourRendering(nn.Module):
         ###########################################################################
         # Debugging
         ###########################################################################
-        print("Name of the object:", x.object_datas[0].label)
+        # print("Name of the object:", x.object_datas[0].label)
         
         # plt.figure()
         # plt.imshow(depth_maps[0].cpu().numpy())
