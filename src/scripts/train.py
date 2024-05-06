@@ -1,5 +1,5 @@
 # Standard libraries
-# from typing import List
+from typing import List
 import sys
 
 # Add the src directory to the system path
@@ -9,13 +9,16 @@ sys.path.append("src/")
 # Third-party libraries
 import hydra
 from omegaconf import DictConfig
-from lightning import LightningDataModule, LightningModule
-# from lightning.pytorch.loggers import Logger
+from lightning import LightningDataModule, LightningModule, Trainer, Callback
+from lightning.pytorch.loggers import Logger
 
 # import cv2
 
 # Custom modules
 from toolbox.utils.pylogger import RankedLogger
+from toolbox.utils.instantiators import instantiate_callbacks, instantiate_loggers
+from toolbox.utils.logging_utils import log_hyperparameters
+from toolbox.utils.utils import get_metric_value
 
 
 log = RankedLogger(__name__, rank_zero_only=True)
@@ -34,10 +37,11 @@ def train(cfg: DictConfig):
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
     
-    datamodule.setup()
+    # datamodule.setup()
     
     # Get 1st data
-    batch = next(iter(datamodule.train_dataloader()))
+    # batch = next(iter(datamodule.train_dataloader()))
+    
     
     # print(batch.rgbs.shape,
     #       len(batch.object_datas),
@@ -68,14 +72,44 @@ def train(cfg: DictConfig):
     
     
     log.info(f"Instantiating model <{cfg.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(cfg.model) 
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
+    
+    log.info("Instantiating callbacks...")
+    callbacks: List[Callback] = instantiate_callbacks(cfg.get("callbacks"))
+
+    log.info("Instantiating loggers...")
+    logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
+    
+    log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+    # trainer: Trainer = hydra.utils.instantiate(cfg.trainer)
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    
+    object_dict = {
+        "cfg": cfg,
+        "datamodule": datamodule,
+        "model": model,
+        "callbacks": callbacks,
+        "logger": logger,
+        "trainer": trainer,
+    }
+    
+    if logger:
+        log.info("Logging hyperparameters!")
+        log_hyperparameters(object_dict)
+
 
     if cfg.get("train"):
         log.info("Starting training...")
-        
-        model(batch)
+        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
 
+        # model(batch)
     
+    train_metrics = trainer.callback_metrics
+    
+    metric_dict = {**train_metrics}
+    
+    return metric_dict, object_dict
+
 
 @hydra.main(version_base="1.3",
             config_path="../../configs/",
@@ -86,7 +120,15 @@ def main(cfg: DictConfig):
     Args:
         cfg (DictConfig): DictConfig object containing the configuration parameters.
     """
-    train(cfg)
+    # Train the model
+    metric_dict, _ = train(cfg)
+    
+    # Safely retrieve metric value for hydra-based hyperparameter optimization
+    metric_value = get_metric_value(
+        metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
+    )
+
+    return metric_value
 
 
 if __name__ == "__main__":

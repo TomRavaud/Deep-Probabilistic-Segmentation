@@ -165,7 +165,7 @@ class GSODataModule(LightningDataModule):
             
             #TODO: How to split the dataset? Separate shards
             self._data_train = data_train
-            self._data_val = None
+            self._data_val = data_train
             self._data_test = None
 
     def train_dataloader(self) -> DataLoader[Any]:
@@ -185,7 +185,12 @@ class GSODataModule(LightningDataModule):
 
         :return: The validation dataloader.
         """
-        pass
+        return DataLoader(
+            dataset=self._data_val,
+            collate_fn=ObjectSegmentationDataset.collate_fn,
+            # worker_init_fn=worker_init_fn,
+            **self.hparams.dataloader_cfg,
+        )
 
     def test_dataloader(self) -> DataLoader[Any]:
         """Create and return the test dataloader.

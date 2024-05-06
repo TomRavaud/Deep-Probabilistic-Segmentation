@@ -5,7 +5,6 @@ from typing import Any, Dict, Tuple
 import torch
 from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
-from torchmetrics.classification.accuracy import Accuracy
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
@@ -64,24 +63,27 @@ class ObjectSegmentationLitModule(LightningModule):
 
         self._model = model
 
-        # loss function
+        # TODO: try focal loss and dice loss
+        # Loss function
         self._criterion = torch.nn.CrossEntropyLoss()
 
-        # metric objects for calculating and averaging accuracy across batches
-        self._train_acc = Accuracy(task="multiclass", num_classes=10)
-        self._val_acc = Accuracy(task="multiclass", num_classes=10)
-        self._test_acc = Accuracy(task="multiclass", num_classes=10)
-
-        # for averaging loss across batches
+        # For averaging loss across batches
         self._train_loss = MeanMetric()
         self._val_loss = MeanMetric()
         self._test_loss = MeanMetric()
 
-        # for tracking best so far validation accuracy
-        self._val_acc_best = MaxMetric()
+        # For tracking best validation loss so far
+        self._val_loss_best = MaxMetric()
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
-        
+        """Forward pass through the model.
+
+        Args:
+            x (BatchSegmentationData): A batch of data.
+
+        Returns:
+            torch.Tensor: The model's predictions.
+        """
         return self._model(x)
 
     def on_train_start(self) -> None:
@@ -90,44 +92,25 @@ class ObjectSegmentationLitModule(LightningModule):
         # starts, so it's worth to make sure validation metrics don't store results
         # from these checks
         self._val_loss.reset()
-        self._val_acc.reset()
-        self._val_acc_best.reset()
-
-    def model_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Perform a single model step on a batch of data.
-
-        :param batch: A batch of data (a tuple) containing the input tensor of images
-            and target labels.
-
-        :return: A tuple containing (in order):
-            - A tensor of losses.
-            - A tensor of predictions.
-            - A tensor of target labels.
-        """
-        x, y = batch
-        logits = self.forward(x)
-        loss = self._criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        
-        return loss, preds, y
+        self._val_loss_best.reset()
 
     def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self,
+        batch: BatchSegmentationData,
     ) -> torch.Tensor:
-        """Perform a single training step on a batch of data from the training set.
-
-        :param batch: A batch of data (a tuple) containing the input tensor of images
-            and target labels.
-        :param batch_idx: The index of the current batch.
-        :return: A tensor of losses between model predictions and targets.
-        """
-        loss, preds, targets = self.model_step(batch)
-
-        # update and log metrics
+        """Perform a single training step on a batch of data from the training set."""
+        
+        # Compute the output of the model
+        segmentation_masks = self.forward(batch)
+        
+        # Compute the loss between the model's predictions and the GT masks
+        loss = self._criterion(
+            segmentation_masks,
+            batch.masks,
+        )
+        
+        # Update and log metric (average loss across batches)
         self._train_loss(loss)
-        self._train_acc(preds, targets)
         self.log(
             "train/loss",
             self._train_loss,
@@ -135,15 +118,7 @@ class ObjectSegmentationLitModule(LightningModule):
             on_epoch=True,
             prog_bar=True,
         )
-        self.log(
-            "train/acc",
-            self._train_acc,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-        )
 
-        # return loss or backpropagation will fail
         return loss
 
     def on_train_epoch_end(self) -> None:
@@ -152,20 +127,22 @@ class ObjectSegmentationLitModule(LightningModule):
 
     def validation_step(
         self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
+        batch: BatchSegmentationData,
     ) -> None:
-        """Perform a single validation step on a batch of data from the validation set.
-
-        :param batch: A batch of data (a tuple) containing the input tensor of images
-            and target labels.
-        :param batch_idx: The index of the current batch.
+        """Perform a single validation step on a batch of data from the validation
+        set.
         """
-        loss, preds, targets = self.model_step(batch)
+        # Compute the output of the model
+        segmentation_masks = self.forward(batch)
+        
+        # Compute the loss between the model's predictions and the GT masks
+        loss = self._criterion(
+            segmentation_masks,
+            batch.masks,
+        )
 
-        # update and log metrics
+        # Update and log metric
         self._val_loss(loss)
-        self._val_acc(preds, targets)
         self.log(
             "val/loss",
             self._val_loss,
@@ -173,23 +150,14 @@ class ObjectSegmentationLitModule(LightningModule):
             on_epoch=True,
             prog_bar=True,
         )
-        self.log(
-            "val/acc",
-            self._val_acc,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-        )
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
-        acc = self._val_acc.compute()  # get current val acc
-        self._val_acc_best(acc)  # update best so far val acc
-        # log `val_acc_best` as a value through `.compute()` method, instead of as a
-        # metric object otherwise metric would be reset by lightning after each epoch
+        val_loss = self._val_loss.compute()  # get current val loss
+        self._val_loss_best(val_loss)  # update best so far val loss
         self.log(
-            "val/acc_best",
-            self._val_acc_best.compute(),
+            "val/loss_best",
+            self._val_loss_best.compute(),
             sync_dist=True,
             prog_bar=True,
         )
@@ -197,29 +165,23 @@ class ObjectSegmentationLitModule(LightningModule):
     def test_step(
         self,
         batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int,
     ) -> None:
         """Perform a single test step on a batch of data from the test set.
-
-        :param batch: A batch of data (a tuple) containing the input tensor of images
-            and target labels.
-        :param batch_idx: The index of the current batch.
         """
-        loss, preds, targets = self.model_step(batch)
+        # Compute the output of the model
+        segmentation_masks = self.forward(batch)
+        
+        # Compute the loss between the model's predictions and the GT masks
+        loss = self._criterion(
+            segmentation_masks,
+            batch.masks,
+        )
 
-        # update and log metrics
+        # Update and log metric
         self._test_loss(loss)
-        self._test_acc(preds, targets)
         self.log(
             "test/loss",
             self._test_loss,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-        )
-        self.log(
-            "test/acc",
-            self._test_acc,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
@@ -232,29 +194,22 @@ class ObjectSegmentationLitModule(LightningModule):
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate),
         validate, test, or predict.
-
-        This is a good hook when you need to build models dynamically or adjust
-        something about them. This hook is called on every process when using DDP.
-
-        :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
         if self.hparams.compile and stage == "fit":
             self._model = torch.compile(self._model)
 
     def configure_optimizers(self) -> Dict[str, Any]:
-        """Choose what optimizers and learning-rate schedulers to use in your
-        optimization. Normally you'd need one. But in the case of GANs or similar you
-        might have multiple.
+        """Define and configure optimizers and learning rate schedulers.
 
-        Examples:
-            https://lightning.ai/docs/pytorch/latest/common/lightning_module.html#configure-optimizers
-
-        :return: A dict containing the configured optimizers and learning-rate
-            schedulers to be used for training.
+        Returns:
+            Dict[str, Any]: A dictionary containing the configures optimizer(s)
+            and learning rate scheduler(s).
         """
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
+        
         if self.hparams.scheduler is not None:
             scheduler = self.hparams.scheduler(optimizer=optimizer)
+            
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -264,6 +219,7 @@ class ObjectSegmentationLitModule(LightningModule):
                     "frequency": 1,
                 },
             }
+        
         return {"optimizer": optimizer}
 
 

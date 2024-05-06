@@ -51,14 +51,17 @@ class ObjectSegmentationModel(nn.Module):
         
         # Instantiate the contour rendering module
         # (for rendering 3D objects, and extracting points along objects contour)
-        self._contour_rendering = ContourRendering(
+        self._contour_rendering_module = ContourRendering(
             object_set=object_set,
             image_size=image_size,
         )
-
+        
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
         self._mobile_sam = MobileSAM()
+        # Freeze the MobileSAM parameters
+        for param in self._mobile_sam.parameters():
+            param.requires_grad = False
         
         # Instantiate the ResNet18 module
         # (for implicit object segmentation prediction)
@@ -69,7 +72,7 @@ class ObjectSegmentationModel(nn.Module):
         
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
-        self._segmentation_mask = SegmentationMask()
+        self._segmentation_mask_module = SegmentationMask()
 
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
@@ -82,7 +85,7 @@ class ObjectSegmentationModel(nn.Module):
             torch.Tensor: A tensor of predictions.
         """
         # Render objects of the batch, extract outer contours points
-        contour_points_list = self._contour_rendering(x)
+        contour_points_list = self._contour_rendering_module(x)
         
         # Predict masks, scores and logits using the MobileSAM model
         mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
@@ -111,7 +114,7 @@ class ObjectSegmentationModel(nn.Module):
         implicit_segmentations = self._resnet18(input_resnet)
         
         # Generate the segmentation masks
-        segmentation_masks = self._segmentation_mask(
+        segmentation_masks = self._segmentation_mask_module(
             x.rgbs,
             implicit_segmentations,
         )

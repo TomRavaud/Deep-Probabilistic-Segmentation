@@ -83,6 +83,9 @@ class MobileSAM(nn.Module):
         # Set the resizing transformation
         resize_transform = ResizeLongestSide(self._mobile_sam.image_encoder.img_size)
 
+        # NOTE: The MobileSAM model expects float images
+        imgs = imgs.float()
+        
         # Resize the images
         imgs = resize_transform.apply_image_torch(imgs)
         # Send the images to the device

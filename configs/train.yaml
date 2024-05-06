@@ -2,11 +2,11 @@ defaults:
   - _self_
   - data: gso
   - model: default
-  - callbacks: null
+  - callbacks: default
   - logger: null
-  - trainer: null
+  - trainer: default
   - paths: default
-  - extras: null
+  - extras: default
   - hydra: default
 
 

@@ -27,6 +27,7 @@ class SegmentationData:
     Data corresponding to a dataset sample.
     
     rgb: (h, w, 3) uint8
+    mask: (h, w) uint8
     object_data: ObjectData
     depth: (bsz, h, w) float32
     bbox: (4, ) int
@@ -34,6 +35,7 @@ class SegmentationData:
     TCO: (4, 4) float32
     """
     rgb: np.ndarray
+    mask: np.ndarray
     bbox: np.ndarray
     TCO: np.ndarray
     DTO: np.ndarray
@@ -49,6 +51,7 @@ class BatchSegmentationData:
     A batch of segmentation data.
 
     rgbs: (bsz, 3, h, w) uint8
+    masks: (bsz, h, w) uint8
     object_datas: List[ObjectData]
     depths: (bsz, h, w) float32
     bboxes: (bsz, 4) int
@@ -56,6 +59,7 @@ class BatchSegmentationData:
     K: (bsz, 3, 3) float32
     """
     rgbs: torch.Tensor
+    masks: torch.Tensor
     object_datas: List[ObjectData]
     bboxes: torch.Tensor
     TCO: torch.Tensor
@@ -70,8 +74,10 @@ class BatchSegmentationData:
             BatchSegmentationData: Batch with pinned memory.
         """
         self.rgbs = self.rgbs.pin_memory()
+        self.masks = self.masks.pin_memory()
         self.bboxes = self.bboxes.pin_memory()
         self.TCO = self.TCO.pin_memory()
+        self.DTO = self.DTO.pin_memory()
         self.K = self.K.pin_memory()
         
         if self.depths is not None:
@@ -174,6 +180,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 1,
                 2,
             ),
+            masks=torch.from_numpy(np.stack([d.mask for d in list_data])),
             bboxes=torch.from_numpy(np.stack([d.bbox for d in list_data])),
             K=torch.from_numpy(np.stack([d.K for d in list_data])),
             TCO=torch.from_numpy(np.stack([d.TCO for d in list_data])),
@@ -429,6 +436,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         # Add depth to SegmentationData
         data = SegmentationData(
             rgb=obs.rgb,
+            mask=(obs.segmentation == object_data.unique_id).astype(np.float32),
             depth=obs.depth if obs.depth is not None else None,
             bbox=object_data.bbox_modal,
             K=obs.camera_data.K,

@@ -28,4 +28,5 @@ dependencies:
     - imageio==2.34.0
     - timm==0.9.10
     - torchinfo==1.8.0
+    - rich==13.7.1
     - git+https://github.com/ChaoningZhang/MobileSAM.git
