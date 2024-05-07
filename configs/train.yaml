@@ -15,3 +15,6 @@ task_name: "train"
 
 # If true, the model will be trained
 train: True
+
+# Seed for random number generators in PyTorch, numpy and python.random
+seed: null

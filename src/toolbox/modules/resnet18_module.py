@@ -57,7 +57,11 @@ class ResNet18(nn.Module):
         if output_dim != 1000:
             # Replace the last fully-connected layer to have output_dim
             # classes as output
-            self._resnet18.fc = nn.LazyLinear(output_dim)
+            self._resnet18.fc = nn.Linear(
+                in_features=self._resnet18.fc.in_features,
+                out_features=output_dim,
+                bias=self._resnet18.fc.bias is not None,
+            )
     
     def forward(
         self,
@@ -87,9 +91,12 @@ class ResNet18(nn.Module):
         
         x = self._resnet18.fc(x)
         
+        # NOTE: The sigmoid activation function is not applied here because it is
+        # applied in the loss function (BCEWithLogitsLoss) to ensure numerical
+        # stability
         # Apply sigmoid activation function to the output to ensure that the values
         # is between 0 and 1
-        x = torch.sigmoid(x)
+        # x = torch.sigmoid(x)
         
         return x
 

@@ -20,11 +20,14 @@ model:
   object_set_cfg:
     # Directory and name of the object set (3D models to render)
     dir: ${paths.data_dir}/google_scanned_objects
-    name: gso.normalized
+    name: gso.normalized_decimated
   
   image_size: ${data.transformations_cfg.resize}
 
+  # Compile parts of the model for faster training with PyTorch 2.0
+  compile: false
 
-
-# Compile model for faster training with pytorch 2.0
-compile: false
+criterion:
+  # TODO: try focal loss and dice loss
+  _target_: torch.nn.BCEWithLogitsLoss
+  reduction: mean

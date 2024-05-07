@@ -24,7 +24,7 @@ class GoogleScannedObjectSet(RigidObjectSet):
         # Set the scaling factor based on the split
         if split == "orig":
             scaling_factor = 30.0
-        elif split in {"normalized", "pointcloud"}:
+        elif split in {"normalized", "pointcloud", "normalized_decimated"}:
             scaling_factor = 0.1
 
         # Get the list of valid object IDs

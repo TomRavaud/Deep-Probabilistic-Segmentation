@@ -31,6 +31,7 @@ class ObjectSegmentationModel(nn.Module):
         self,
         image_size: ListConfig,
         object_set_cfg: Optional[DictConfig] = None,
+        compile: bool = False,
     ) -> None:
         """
         Initialize an `ObjectSegmentationModel` module.
@@ -58,7 +59,10 @@ class ObjectSegmentationModel(nn.Module):
         
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
-        self._mobile_sam = MobileSAM()
+        self._mobile_sam = MobileSAM(
+            sam_checkpoint="weights/mobile_sam.pt",
+            compile=compile,
+        )
         # Freeze the MobileSAM parameters
         for param in self._mobile_sam.parameters():
             param.requires_grad = False
@@ -70,9 +74,17 @@ class ObjectSegmentationModel(nn.Module):
             nb_input_channels=4,  # 3 RGB channels + 1 mask channel
         ).to(device=self._device)
         
+        if compile:
+            self._resnet18 =\
+                torch.compile(self._resnet18)
+        
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
         self._segmentation_mask_module = SegmentationMask()
+
+        if compile:
+            self._segmentation_mask_module =\
+                torch.compile(self._segmentation_mask_module)
 
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:

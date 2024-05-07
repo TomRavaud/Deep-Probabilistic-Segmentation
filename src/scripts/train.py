@@ -9,7 +9,7 @@ sys.path.append("src/")
 # Third-party libraries
 import hydra
 from omegaconf import DictConfig
-from lightning import LightningDataModule, LightningModule, Trainer, Callback
+from lightning import LightningDataModule, LightningModule, Trainer, Callback, seed_everything
 from lightning.pytorch.loggers import Logger
 
 # import cv2
@@ -30,9 +30,9 @@ def train(cfg: DictConfig):
     Args:
         cfg (DictConfig): DictConfig object containing the configuration parameters.
     """
-    # # Set seed for random number generators in pytorch, numpy and python.random
-    # if cfg.get("seed"):
-    #     L.seed_everything(cfg.seed, workers=True)
+    # Set seed for random number generators in PyTorch, numpy and python.random
+    if cfg.get("seed"):
+        seed_everything(cfg.seed, workers=True)
 
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
@@ -81,8 +81,11 @@ def train(cfg: DictConfig):
     logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
     
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    # trainer: Trainer = hydra.utils.instantiate(cfg.trainer)
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    trainer: Trainer = hydra.utils.instantiate(
+        cfg.trainer,
+        callbacks=callbacks,
+        logger=logger,
+    )
     
     object_dict = {
         "cfg": cfg,

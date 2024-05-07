@@ -1,4 +1,4 @@
-name: deepseg2
+name: deepseg
 
 channels:
   - conda-forge

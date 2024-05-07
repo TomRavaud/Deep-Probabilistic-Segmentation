@@ -8,12 +8,21 @@ max_epochs: 10
 accelerator: gpu
 devices: 1
 
-# mixed precision for extra speed-up
+# Mixed precision for extra speed-up
 # precision: 16
 
-# perform a validation loop every N training epochs
+# Perform a validation loop every N training epochs
 check_val_every_n_epoch: 1
 
-# set True to to ensure deterministic results
+# Set to True to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
 deterministic: False
+
+# Enable cudnn to use the optimal set of algorithms (faster only for fixed input size)
+benchmark: True
+
+# Set the number of batches to consider for a single epoch (be careful: it applies to
+# each dataloader individually)
+limit_train_batches: 5
+limit_val_batches: 5
+limit_test_batches: 5

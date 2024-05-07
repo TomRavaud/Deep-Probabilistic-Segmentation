@@ -51,8 +51,8 @@ class ContourRendering(nn.Module):
         self._rasterizer = MeshRasterizer(
             cameras=None,
             raster_settings=raster_settings,
-        )
-         
+        ).to(device=self._device)
+        
         if not self._debug:
             
             # Get the paths to the meshes of the objects

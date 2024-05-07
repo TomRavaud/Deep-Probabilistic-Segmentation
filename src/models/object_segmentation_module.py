@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple
 # Third-party libraries
 import torch
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric
+from torchmetrics import MinMetric, MeanMetric
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
@@ -45,9 +45,9 @@ class ObjectSegmentationLitModule(LightningModule):
     def __init__(
         self,
         model: torch.nn.Module,
+        criterion: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
-        compile: bool,
     ) -> None:
         """Initialize a `MNISTLitModule`.
 
@@ -59,21 +59,21 @@ class ObjectSegmentationLitModule(LightningModule):
 
         # Allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False, ignore=["model"])
-
+        self.save_hyperparameters(logger=False, ignore=["model", "criterion"])
+        
+        # Model
         self._model = model
 
-        # TODO: try focal loss and dice loss
         # Loss function
-        self._criterion = torch.nn.CrossEntropyLoss()
-
+        self._criterion = criterion
+        
         # For averaging loss across batches
         self._train_loss = MeanMetric()
         self._val_loss = MeanMetric()
         self._test_loss = MeanMetric()
 
         # For tracking best validation loss so far
-        self._val_loss_best = MaxMetric()
+        self._val_loss_best = MinMetric()
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
         """Forward pass through the model.
@@ -195,8 +195,7 @@ class ObjectSegmentationLitModule(LightningModule):
         """Lightning hook that is called at the beginning of fit (train + validate),
         validate, test, or predict.
         """
-        if self.hparams.compile and stage == "fit":
-            self._model = torch.compile(self._model)
+        pass
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Define and configure optimizers and learning rate schedulers.

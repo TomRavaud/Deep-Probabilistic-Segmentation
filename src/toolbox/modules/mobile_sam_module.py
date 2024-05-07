@@ -18,23 +18,22 @@ class MobileSAM(nn.Module):
     """
     Module that uses the MobileSAM model to predict masks.
     """
-    def __init__(self):
+    def __init__(self, sam_checkpoint: str, compile: bool = False) -> None:
         
         super().__init__()
         
         # Choose the image encoder
         model_type = "vit_t"
 
-        #TODO: Set the path to the MobileSAM weights as a parameter
-        # Load the MobileSAM weights
-        sam_checkpoint = "weights/mobile_sam.pt"
-        
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # Load the MobileSAM model and set it to evaluation mode
         self._mobile_sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         self._mobile_sam.to(device=device)
         self._mobile_sam.eval()
+        
+        if compile:
+            self._mobile_sam = torch.compile(self._mobile_sam)
         
     @staticmethod
     def _get_bboxes_from_contours(contours: list) -> torch.Tensor:
@@ -83,7 +82,7 @@ class MobileSAM(nn.Module):
         # Set the resizing transformation
         resize_transform = ResizeLongestSide(self._mobile_sam.image_encoder.img_size)
 
-        # NOTE: The MobileSAM model expects float images
+        # The MobileSAM model expects float images
         imgs = imgs.float()
         
         # Resize the images

@@ -41,6 +41,8 @@ def make_object_set(name: str, dir: str) -> RigidObjectSet:
                                   "normalized before being used. Not supported yet.")
     elif name == "gso.normalized":
         objset = GoogleScannedObjectSet(path, split="normalized")
+    elif name == "gso.normalized_decimated":
+        objset = GoogleScannedObjectSet(path, split="normalized_decimated")
     else:
         raise ValueError(f"Unknown object set name: {name}")
     

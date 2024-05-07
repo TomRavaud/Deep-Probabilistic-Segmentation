@@ -256,5 +256,4 @@ class GSODataModule(LightningDataModule):
 
 
 if __name__ == "__main__":
-    _ = GSODataModule() 
-    
+    _ = GSODataModule()

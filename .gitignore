@@ -3,7 +3,7 @@ __pycache__/
 .vscode/
 
 /data/*
-!/data/.gitkeep
+!/data/download_gso_data.sh
 
 /logs/*
 !/logs/.gitkeep
