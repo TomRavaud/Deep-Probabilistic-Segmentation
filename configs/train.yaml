@@ -3,7 +3,7 @@ defaults:
   - data: gso
   - model: default
   - callbacks: default
-  - logger: null
+  - logger: csv
   - trainer: default
   - paths: default
   - extras: default
@@ -15,6 +15,14 @@ task_name: "train"
 
 # If true, the model will be trained
 train: True
+
+optimized_metric: val/loss_best
+
+# If true, the model will be evaluated on the test set
+test: False
+
+# Provide a path to a checkpoint to resume training from
+ckpt_path: null
 
 # Seed for random number generators in PyTorch, numpy and python.random
 seed: null

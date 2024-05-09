@@ -12,7 +12,7 @@
     p: 0.3
 - type: PillowBrightness
   params:
-    factor_interval: [0.1, 6.0]
+    factor_interval: [0.1, 5.0]
     p: 0.5
 - type: PillowColor
   params:

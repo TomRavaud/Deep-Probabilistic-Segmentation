@@ -1,4 +1,12 @@
+<div align="center">
+
 # Deep Probabilistic Segmentation
+
+<a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
+<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
+<a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
+
+</div>
 
 ## Description
 
@@ -29,6 +37,10 @@ cd data
 bash download_gso_data.sh
 ```
 To avoid downloading the whole dataset, this script allows you to specify the number of shards to download. Follow the displayed instructions when running it.
+
+## MobileSAM weights
+
+The model makes use of the MobileSAM pretrained model. You can download the weights from the [MobileSAM repository](https://github.com/ChaoningZhang/MobileSAM). Once downloaded, set the path to the weights in the configuration file `configs/model/default.yaml` or as a command line argument.
 
 ## Usage
 

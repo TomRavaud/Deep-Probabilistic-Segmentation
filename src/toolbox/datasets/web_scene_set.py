@@ -29,6 +29,7 @@ class WebSceneSet(SceneSet):
     def __init__(
         self,
         wds_dir: Path,
+        split_range: tuple = (0., 1.),
         load_depth: bool = True,
         load_segmentation: bool = True,
         label_format: str = "{label}",
@@ -36,6 +37,7 @@ class WebSceneSet(SceneSet):
     ):
         self.label_format = label_format
         self.wds_dir = wds_dir
+        self.split_range = split_range
 
         frame_index = None
         if load_frame_index:
@@ -55,8 +57,6 @@ class WebSceneSet(SceneSet):
             load_segmentation=load_segmentation,
         )
 
-    # NOTE: I could add a skip_shards parameter to split the set into train, validation
-    # and test sets. SHARD LEVEL SPLITTING.
     def get_tar_list(self) -> List[str]:
         """Get the list of tar files in the dataset directory.
 
@@ -65,6 +65,15 @@ class WebSceneSet(SceneSet):
         """
         tar_files = [str(x) for x in self.wds_dir.iterdir() if x.suffix == ".tar"]
         tar_files.sort()
+        
+        if self.split_range[0] < 0. or\
+            self.split_range[1] > 1. or\
+                self.split_range[0] >= self.split_range[1]:
+            raise ValueError(f"Invalid split range: {self.split_range}")
+        
+        tar_files = tar_files[
+            int(len(tar_files) * self.split_range[0]):
+                int(len(tar_files) * self.split_range[1])]
         
         return tar_files
 
@@ -173,7 +182,6 @@ class IterableWebSceneSet(IterableSceneSet):
             # Shuffle the samples
             wds.shuffle(buffer_size),
         )
-        # print("Shards: ", self.web_scene_set.get_tar_list())
 
     def __iter__(self):
         return iter(self.datapipeline)

@@ -135,42 +135,12 @@ class ContourRendering(nn.Module):
             object_set.get_id_from_label(obj_data.label) for obj_data in x.object_datas
         ]
         
-        
-        #FIXME: rotation issue
         # Apply the perturbation to the ground truth pose
-        # TCO = torch.bmm(x.TCO, x.DTO)
-        # TCO = torch.bmm(x.DTO, x.TCO)
-        
-        TCO = x.TCO
+        TCO = torch.bmm(x.TCO, x.DTO)
         
         # Rotation matrices and translation vectors
-        R1 = TCO[:, :3, :3]
-        tvec1 = TCO[:, :3, 3]
-        
-        
-        DTO = x.DTO
-        
-        R2 = DTO[:, :3, :3]
-        tvec2 = DTO[:, :3, 3]
-        
-        inv_R2 = torch.transpose(R2, 1, 2)
-        
-        tvec1 = tvec1[..., None]
-        tvec2 = tvec2[..., None]
-        
-        delta_t = tvec1 - tvec2
-        
-        # print("inv_R2:", inv_R2.shape)
-        # print("R1:", R1.shape)
-        # print("delta_t:", delta_t.shape)
-        
-        R = torch.bmm(inv_R2, R1)
-        
-        # print("inv_R2:", inv_R2.shape)
-        # print("delta_t:", delta_t.shape)
-        
-        tvec = torch.bmm(inv_R2, delta_t).squeeze(-1)
-        
+        R = TCO[:, :3, :3]
+        tvec = TCO[:, :3, 3]
         
         # Set the cameras
         cameras = cameras_from_opencv_projection(

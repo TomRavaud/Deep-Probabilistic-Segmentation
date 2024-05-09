@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torchvision import transforms
 from omegaconf import DictConfig, ListConfig
+import numpy as np
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
@@ -30,6 +31,7 @@ class ObjectSegmentationModel(nn.Module):
     def __init__(
         self,
         image_size: ListConfig,
+        sam_checkpoint: str,
         object_set_cfg: Optional[DictConfig] = None,
         compile: bool = False,
     ) -> None:
@@ -60,7 +62,7 @@ class ObjectSegmentationModel(nn.Module):
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
         self._mobile_sam = MobileSAM(
-            sam_checkpoint="weights/mobile_sam.pt",
+            sam_checkpoint=sam_checkpoint,
             compile=compile,
         )
         # Freeze the MobileSAM parameters

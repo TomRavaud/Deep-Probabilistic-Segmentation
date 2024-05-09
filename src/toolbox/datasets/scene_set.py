@@ -431,8 +431,7 @@ class SceneSet(torch.utils.data.Dataset):
             load_depth (bool, optional): Whether to load depth images.
                                          Defaults to False.
             load_segmentation (bool, optional): Whether to load image segmentation.
-            Defaults to True.
-            Defaults to f'{label}'.
+                Defaults to True.
         """
         self.frame_index = frame_index
         self.load_depth = load_depth

@@ -15,16 +15,35 @@ _target_: datamodules.gso_datamodule.GSODataModule
 #-------------------------------------------------------#
 
 # Scene set(s)
-scene_set_cfg:
-  dir: ${paths.data_dir}
+scene_sets_cfg:
 
-  # Set a buffer size > 1 to allow approximate shuffling of the samples
-  sample_buffer_size: 200
+  train:
+    dir: ${paths.data_dir}
 
-  # List of scene sets configurations
-  sets_cfg:
-    - name: webdataset.gso_1M
-      n_repeats: 1  # Number of times to repeat the set
+    # Set a buffer size > 1 to allow approximate shuffling of the samples
+    sample_buffer_size: 200
+
+    # List of scene sets configurations
+    sets_cfg:
+      - name: webdataset.gso_1M
+        split_range: [0.0, 0.8]
+        n_repeats: 1  # Number of times to repeat the set
+  
+  val:
+    dir: ${paths.data_dir}
+    sample_buffer_size: 200
+    sets_cfg: 
+      - name: webdataset.gso_1M
+        split_range: [0.8, 0.9]
+        n_repeats: 1
+  
+  test:
+    dir: ${paths.data_dir}
+    sample_buffer_size: 200
+    sets_cfg: 
+      - name: webdataset.gso_1M
+        split_range: [0.9, 1.0]
+        n_repeats: 1
 
 # Dataset parameters
 dataset_cfg:
@@ -44,6 +63,12 @@ dataset_cfg:
   # before raising an exception
   valid_data_max_attempts: 200
 
+  # Probability of applying a pose perturbation
+  pose_perturbation_prob: 0.8
+  # Scale factors for perturbations sampling
+  rel_translation_scale: 0.3  # normalized units
+  abs_rotation_scale: 20.0  # degrees
+
 # Dataloader parameters
 dataloader_cfg:
   batch_size: 8
@@ -60,8 +85,6 @@ transformations_cfg:
 
   # Probability of applying the augmentations
   augmentations_p: 0.8
-
-  rgb_augmentations: null
 
   # Override the default background augmentations
   background_augmentations: null

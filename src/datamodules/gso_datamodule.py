@@ -55,7 +55,7 @@ class GSODataModule(LightningDataModule):
     """  
     def __init__(
         self,
-        scene_set_cfg: Optional[DictConfig] = None,
+        scene_sets_cfg: Optional[DictConfig] = None,
         dataset_cfg: Optional[DictConfig] = None,
         dataloader_cfg: Optional[DictConfig] = None,
         transformations_cfg: Optional[DictConfig] = None,
@@ -148,13 +148,19 @@ class GSODataModule(LightningDataModule):
         # Load and split datasets only if not loaded already
         if not self._data_train and not self._data_val and not self._data_test:
             
-            # Create an iterable scene set from [a/multiple] scene set(s)
+            # Create iterable scene sets from [a/multiple] scene set(s)
             scene_set_train = make_iterable_scene_set(
-                **self.hparams.scene_set_cfg,
+                **self.hparams.scene_sets_cfg.train,
+            )
+            scene_set_val = make_iterable_scene_set(
+                **self.hparams.scene_sets_cfg.val,
+            )
+            scene_set_test = make_iterable_scene_set(
+                **self.hparams.scene_sets_cfg.test,
             )
             
-            # Train dataset
-            data_train = ObjectSegmentationDataset(
+            # Datasets
+            self._data_train = ObjectSegmentationDataset(
                 scene_set_train,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,
@@ -162,12 +168,23 @@ class GSODataModule(LightningDataModule):
                 depth_augmentations=self._depth_augmentations,
                 **self.hparams.dataset_cfg,
             )
+            self._data_val = ObjectSegmentationDataset(
+                scene_set_val,
+                resize_transform=self._resize_transform,
+                background_augmentations=self._background_augmentations,
+                rgb_augmentations=self._rgb_augmentations,
+                depth_augmentations=self._depth_augmentations,
+                **self.hparams.dataset_cfg,
+            )
+            self._data_test = ObjectSegmentationDataset(
+                scene_set_test,
+                resize_transform=self._resize_transform,
+                background_augmentations=self._background_augmentations,
+                rgb_augmentations=self._rgb_augmentations,
+                depth_augmentations=self._depth_augmentations,
+                **self.hparams.dataset_cfg,
+            )
             
-            #TODO: How to split the dataset? Separate shards
-            self._data_train = data_train
-            self._data_val = data_train
-            self._data_test = None
-
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
 
@@ -197,7 +214,12 @@ class GSODataModule(LightningDataModule):
 
         :return: The test dataloader.
         """
-        pass
+        return DataLoader(
+            dataset=self._data_test,
+            collate_fn=ObjectSegmentationDataset.collate_fn,
+            # worker_init_fn=worker_init_fn,
+            **self.hparams.dataloader_cfg,
+        )
 
     def teardown(self, stage: Optional[str] = None) -> None:
         """Lightning hook for cleaning up after `trainer.fit()`, `trainer.validate()`,

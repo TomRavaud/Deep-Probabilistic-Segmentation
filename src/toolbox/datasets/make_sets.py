@@ -52,6 +52,7 @@ def make_object_set(name: str, dir: str) -> RigidObjectSet:
 def make_scene_set(
     set_name: str,
     set_path: Path,
+    split_range: tuple = (0., 1.),
     load_depth: bool = False,
     n_frames: Optional[int] = None,
 ) -> SceneSet:
@@ -74,7 +75,7 @@ def make_scene_set(
     # Datasets in webdataset format
     if set_name.startswith("webdataset."):
         set_name = set_name[len("webdataset.") :]
-        scene_set = WebSceneSet(set_path / set_name)
+        scene_set = WebSceneSet(set_path / set_name, split_range=split_range)
 
     else:
         raise ValueError(f"Unknown scene set name: {set_name}")
@@ -126,6 +127,7 @@ def make_iterable_scene_set(
             this_set_config.name,
             load_depth=input_depth,
             set_path=path,
+            split_range=tuple(this_set_config.split_range),
         )
         
         # Convert the SceneSet into an IterableSceneSet

@@ -9,9 +9,14 @@ sys.path.append("src/")
 # Third-party libraries
 import hydra
 from omegaconf import DictConfig
-from lightning import LightningDataModule, LightningModule, Trainer, Callback, seed_everything
+from lightning import (
+    LightningDataModule,
+    LightningModule,
+    Trainer,
+    Callback,
+    seed_everything,
+)
 from lightning.pytorch.loggers import Logger
-
 # import cv2
 
 # Custom modules
@@ -109,7 +114,21 @@ def train(cfg: DictConfig):
     
     train_metrics = trainer.callback_metrics
     
-    metric_dict = {**train_metrics}
+    if cfg.get("test"):
+        log.info("Starting testing!")
+        ckpt_path = trainer.checkpoint_callback.best_model_path
+        
+        if ckpt_path == "":
+            log.warning("Best ckpt not found! Using current weights for testing...")
+            ckpt_path = None
+        
+        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+        log.info(f"Best ckpt path: {ckpt_path}")
+    
+    test_metrics = trainer.callback_metrics
+    
+    # Gather all metrics
+    metric_dict = {**train_metrics, **test_metrics}
     
     return metric_dict, object_dict
 

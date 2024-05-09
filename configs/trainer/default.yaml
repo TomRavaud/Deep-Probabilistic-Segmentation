@@ -3,7 +3,7 @@ _target_: lightning.pytorch.trainer.Trainer
 default_root_dir: ${paths.output_dir}
 
 min_epochs: 1  # prevents early stopping
-max_epochs: 10
+max_epochs: 3
 
 accelerator: gpu
 devices: 1
@@ -13,6 +13,9 @@ devices: 1
 
 # Perform a validation loop every N training epochs
 check_val_every_n_epoch: 1
+
+# Used to resolve a warning, no impact on logging
+log_every_n_steps: 1
 
 # Set to True to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
@@ -24,5 +27,5 @@ benchmark: True
 # Set the number of batches to consider for a single epoch (be careful: it applies to
 # each dataloader individually)
 limit_train_batches: 5
-limit_val_batches: 5
+limit_val_batches: 2
 limit_test_batches: 5

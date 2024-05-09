@@ -24,6 +24,9 @@ model:
   
   image_size: ${data.transformations_cfg.resize}
 
+  # Pretrained weights for the MobileSAM model
+  sam_checkpoint: weights/mobile_sam.pt
+
   # Compile parts of the model for faster training with PyTorch 2.0
   compile: false
 

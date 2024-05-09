@@ -117,6 +117,9 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         return_first_object: bool = False,
         keep_labels_set: Optional[Set[str]] = None,
         valid_data_max_attempts: int = 200,
+        pose_perturbation_prob: float = 0.0,
+        rel_translation_scale: Optional[float] = None,
+        abs_rotation_scale: Optional[float] = None,
         resize_transform: Optional[SceneObservationTransform] = None,
         rgb_augmentations: Optional[SceneObservationTransform] = None,
         depth_augmentations: Optional[SceneObservationTransform] = None,
@@ -152,6 +155,10 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         self._return_first_object = return_first_object
         self._keep_labels_set = keep_labels_set
         self._valid_data_max_attempts = valid_data_max_attempts
+        
+        self._pose_perturbation_prob = pose_perturbation_prob
+        self._rel_translation_scale = rel_translation_scale
+        self._abs_rotation_scale = abs_rotation_scale
         
         # Transformations (resize, augmentations)
         self._resize_transform = resize_transform
@@ -234,29 +241,17 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         bbox: np.ndarray,
         K: np.ndarray,
         Z: float,
-        xy_translation: bool = True,
-        xy_translation_scale: float = 0.3,
-        z_translation: bool = True,
-        z_translation_scale: float = 0.3,
-        rotation: bool = True,
-        rotation_scale: float = 20.0,
+        rel_translation_scale: Optional[float] = None,
+        abs_rotation_scale: Optional[float] = None,
     ) -> np.ndarray:
-        """Sample a random pose perturbation with respect to the camera frame.
+        """Sample a random pose perturbation with respect to the object's pose.
 
         Args:
             bbox (np.ndarray): Bounding box of the object in the image (modal bbox).
             K (np.ndarray): Camera intrinsic matrix.
             Z (float): Depth of the object in the camera frame.
-            xy_translation (bool, optional): Whether to sample a random XY translation.
-                Defaults to True.
-            xy_translation_scale (float, optional): Relative scale of the XY translation
-                (radius of the circle, no units). Defaults to 0.3.
-            z_translation (bool, optional): Whether to sample a random Z translation.
-                Defaults to True.
-            z_translation_scale (float, optional): Relative scale of the Z translation
+            translation_scale (float, optional): Relative scale of the translation
                 (no units). Defaults to 0.3.
-            rotation (bool, optional): Whether to sample a random rotation. Defaults to
-                True.
             rotation_scale (float, optional): Absolute scale of the rotation (degrees).
                 Defaults to 20.
 
@@ -275,40 +270,33 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         Y1 = Z/f * (bbox[1] - cy)
         Y2 = Z/f * (bbox[3] - cy)
         
-        # XY translation (in-plane translation)
-        if xy_translation:
-            # Random perturbation (uniform distribution in a circle of radius
-            # xy_translation_scale
-            x_scale = xy_translation_scale * (X2 - X1)
-            Dx = random.uniform(-x_scale, x_scale)
-            y_scale = xy_translation_scale * (Y2 - Y1)
-            Dy = random.uniform(-y_scale, y_scale)
-            Dt[0] = Dx
-            Dt[1] = Dy
-
-        # Z translation (scale)
-        if z_translation:
-            # Random perturbation
-            z_scale = z_translation_scale * np.min([X2 - X1, Y2 - Y1])
-            Dz = random.uniform(-z_scale, z_scale)
-            Dt[2] = Dz
-
-        # Rotation
-        if rotation:
+        if rel_translation_scale is not None:
+            
+            # Set the absolute translation scale (adapted to the object size and
+            # visibility)
+            abs_translation_scale = rel_translation_scale * np.min([X2 - X1, Y2 - Y1])
+            
+            # Sample a random axis (unit vector)
+            axis = np.random.rand(3)
+            axis /= np.linalg.norm(axis)
+            
+            # Random translation (uniform distribution in a sphere of radius
+            # abs_translation_scale)
+            magnitude = np.random.uniform(-abs_translation_scale, abs_translation_scale)
+            Dt = magnitude * axis
+        
+        if abs_rotation_scale is not None:
+            
             # Random angle
-            perturbation = random.uniform(-rotation_scale, rotation_scale)
-            perturbation_rad = perturbation * np.pi / 180
+            angle_deg = random.uniform(-abs_rotation_scale, abs_rotation_scale)
+            angle_rad = angle_deg * np.pi / 180
+            
             # Random axis (unit vector)
             axis = np.random.rand(3)
             axis /= np.linalg.norm(axis)
-            DR = cv2.Rodrigues(perturbation_rad * axis)[0]
             
-            # 20 degrees rotation around Z axis
-            theta = 90 * np.pi / 180
-            DR = np.array([[np.cos(theta), -np.sin(theta), 0],
-                           [np.sin(theta), np.cos(theta), 0],
-                            [0, 0, 1]])
-        
+            DR = cv2.Rodrigues(angle_rad * axis)[0]
+            
         # Transform matrix
         DT = np.eye(4, dtype=np.float32)
         DT[:3, :3] = DR
@@ -424,14 +412,18 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         assert object_data.TWO is not None
         
         TCO = (obs.camera_data.TWC.inverse() * object_data.TWO).matrix
-        DTO = ObjectSegmentationDataset._sample_random_pose_perturbation(
-            bbox=object_data.bbox_modal,
-            K=obs.camera_data.K,
-            Z=TCO[2, 3],
-            xy_translation=True,
-            z_translation=True,
-            rotation=False,
-        )
+        
+        # Sample a random pose perturbation
+        if random.random() <= self._pose_perturbation_prob:
+            DTO = ObjectSegmentationDataset._sample_random_pose_perturbation(
+                bbox=object_data.bbox_modal,
+                K=obs.camera_data.K,
+                Z=TCO[2, 3],
+                rel_translation_scale=self._rel_translation_scale,
+                abs_rotation_scale=self._abs_rotation_scale,
+            )
+        else:
+            DTO = np.eye(4, dtype=np.float32)
         
         # Add depth to SegmentationData
         data = SegmentationData(
