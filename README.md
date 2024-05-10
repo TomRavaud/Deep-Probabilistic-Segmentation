@@ -38,6 +38,15 @@ bash download_gso_data.sh
 ```
 To avoid downloading the whole dataset, this script allows you to specify the number of shards to download. Follow the displayed instructions when running it.
 
+## Meshes decimation
+
+To reduce the resolution of the 3D models, you can use the `src/scripts/meshlab/decimate_meshes.py` script. This script uses MeshLab from the Python library `PyMeshLab` and performs a quadric edge collapse decimation on the meshes. It is recommended to use it to make the batch rendering process more efficient, as we are only interested in the projected silhouette of the object in the image. To use the script, make sure you have MeshLab and PyMeshLab installed and run:
+
+```bash
+python src/scripts/meshlab/decimate_meshes.py --src_object_set_path {path_to_original_models} --dst_object_set_path {path_to_save_decimated_models} --num_faces {target_number_of_faces}
+```
+By default, the script will decimate the meshes to 1000 faces.
+
 ## MobileSAM weights
 
 The model makes use of the MobileSAM pretrained model. You can download the weights from the [MobileSAM repository](https://github.com/ChaoningZhang/MobileSAM). Once downloaded, set the path to the weights in the configuration file `configs/model/default.yaml` or as a command line argument.
