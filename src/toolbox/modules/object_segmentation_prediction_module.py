@@ -16,6 +16,9 @@ import numpy as np
 from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.mobile_sam_module import MobileSAM
 from toolbox.modules.segmentation_mask_module import SegmentationMask
+from toolbox.modules.segmentation_with_histograms_module import (
+    SegmentationWithHistograms
+)
 
 
 @dataclass
@@ -39,7 +42,11 @@ class ObjectSegmentationPredictionModel(nn.Module):
     Module that predicts object segmentations using the MobileSAM and ResNet18
     pre-trained models.
     """
-    def __init__(self, compile: bool = False) -> None:
+    def __init__(
+        self,
+        use_histograms: bool = False,
+        compile: bool = False,
+    ) -> None:
         """Constructor of the ObjectSegmentationPredictionModel.
 
         Args:
@@ -62,15 +69,20 @@ class ObjectSegmentationPredictionModel(nn.Module):
             compile=compile,
         )
         
-        # Instantiate the ResNet18 module
-        # (for implicit object segmentation prediction)
-        self._resnet18 = ResNet18(
-            output_dim=180,  # Hue values
-            nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-        ).to(device=self._device)
-        if compile:
-            self._resnet18 =\
-                torch.compile(self._resnet18)
+        if use_histograms:
+            self._implicit_segmentation_module = SegmentationWithHistograms(
+                output_dim=180,  # Hue values
+            )
+        else:
+            # Instantiate the ResNet18 module
+            # (for implicit object segmentation prediction)
+            self._implicit_segmentation_module = ResNet18(
+                output_dim=180,  # Hue values
+                nb_input_channels=4,  # 3 RGB channels + 1 mask channel
+            ).to(device=self._device)
+            if compile:
+                self._resnet18 =\
+                    torch.compile(self._resnet18)
         
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
@@ -109,14 +121,19 @@ class ObjectSegmentationPredictionModel(nn.Module):
         rgbs = rgbs.to(dtype=torch.float32)
         rgbs /= 255.0
         
+        #FIXME: how to deal with the normalization?
         # Normalize the RGB images
-        rgbs_normalized = self._normalize_transform(rgbs)
+        rgbs_normalized = rgbs
+        # rgbs_normalized = self._normalize_transform(rgbs)
         
         # Combine masks and RGB images
-        input_resnet = torch.cat([rgbs_normalized, masks], dim=1)
+        input_implicit_segmentation = torch.cat([rgbs_normalized, masks], dim=1)
         
-        # Predict implicit object segmentations using the ResNet18 model
-        implicit_segmentations = self._resnet18(input_resnet)
+        # Predict implicit object segmentations using the ResNet18 model or the
+        # SegmentationWithHistograms module (histograms + Bayes)
+        implicit_segmentations = self._implicit_segmentation_module(
+            input_implicit_segmentation,
+        )
         
         # Generate the segmentation masks
         segmentation_masks = self._segmentation_mask_module(
@@ -132,13 +149,16 @@ class ObjectSegmentationPredictionModule(nn.Module):
     Module that predicts object segmentations using the
     ObjectSegmentationPredictionModel.
     """
-    def __init__(self):
+    def __init__(self, use_histograms: bool = False, compile: bool = False) -> None:
         """
         Constructor of the ObjectSegmentationPredictionModule.
         """
         super().__init__()
         
-        self._model = ObjectSegmentationPredictionModel()
+        self._model = ObjectSegmentationPredictionModel(
+            use_histograms=use_histograms,
+            compile=compile,
+        )
     
     @torch.no_grad()
     def forward(self, x: BatchInferenceData) -> tuple[torch.Tensor, torch.Tensor]:
