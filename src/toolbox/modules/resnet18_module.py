@@ -105,7 +105,7 @@ if __name__ == "__main__":
     
     torchinfo.summary(
         ResNet18(
-            nb_classes=15,
+            output_dim=15,
             nb_input_channels=None,
         ),
         input_size=(32, 5, 224, 224),

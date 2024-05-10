@@ -8,9 +8,6 @@ __pycache__/
 /logs/*
 !/logs/.gitkeep
 
-/notebooks/*
-!/notebooks/.gitkeep
-
 /tests/*
 !/tests/.gitkeep
 

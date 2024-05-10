@@ -93,7 +93,7 @@ class ObjectSegmentationModel(nn.Module):
         """Perform a single forward pass through the network.
 
         Args:
-            x (torch.Tensor): The input tensor.
+            x (BatchSegmentationData): A batch of segmentation data.
 
         Returns:
             torch.Tensor: A tensor of predictions.

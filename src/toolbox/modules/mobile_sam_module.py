@@ -1,5 +1,5 @@
 # Standard libraries
-from typing import Tuple
+from typing import Tuple, Optional
 
 # Third-party libraries
 import torch
@@ -18,7 +18,11 @@ class MobileSAM(nn.Module):
     """
     Module that uses the MobileSAM model to predict masks.
     """
-    def __init__(self, sam_checkpoint: str, compile: bool = False) -> None:
+    def __init__(
+        self,
+        sam_checkpoint: Optional[str] = None,
+        compile: bool = False,
+    ) -> None:
         
         super().__init__()
         
