@@ -50,17 +50,14 @@ class ObjectSegmentationPredictionModel(nn.Module):
         """Constructor of the ObjectSegmentationPredictionModel.
 
         Args:
+            use_histograms (bool, optional): Whether to use histograms for
+                implicit object segmentation prediction. Defaults to False.
             compile (bool, optional): Whether to compile parts of the model.
                 Defaults to False.
         """
         super().__init__()
         
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        self._normalize_transform = transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
-                std=[0.229, 0.224, 0.225],
-        )
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
         
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
@@ -73,6 +70,9 @@ class ObjectSegmentationPredictionModel(nn.Module):
             self._implicit_segmentation_module = SegmentationWithHistograms(
                 output_dim=180,  # Hue values
             )
+            # No need to normalize the RGB images (identity function)
+            self._normalize_transform = lambda x: x
+        
         else:
             # Instantiate the ResNet18 module
             # (for implicit object segmentation prediction)
@@ -80,9 +80,15 @@ class ObjectSegmentationPredictionModel(nn.Module):
                 output_dim=180,  # Hue values
                 nb_input_channels=4,  # 3 RGB channels + 1 mask channel
             ).to(device=self._device)
+            
             if compile:
-                self._resnet18 =\
-                    torch.compile(self._resnet18)
+                self._implicit_segmentation_module =\
+                    torch.compile(self._implicit_segmentation_module)
+            
+            self._normalize_transform = transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
+                std=[0.229, 0.224, 0.225],
+            )
         
         # Instantiate the segmentation mask module
         # (for segmentation mask computation)
@@ -107,7 +113,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
         
         # Stack the masks from the MobileSAM outputs
         masks = torch.stack([
-            output["masks"][torch.argmax(output["iou_predictions"])]
+            output["masks"][:, torch.argmax(output["iou_predictions"])]
             for output in mobile_sam_outputs
         ])
         
@@ -121,10 +127,8 @@ class ObjectSegmentationPredictionModel(nn.Module):
         rgbs = rgbs.to(dtype=torch.float32)
         rgbs /= 255.0
         
-        #FIXME: how to deal with the normalization?
         # Normalize the RGB images
-        rgbs_normalized = rgbs
-        # rgbs_normalized = self._normalize_transform(rgbs)
+        rgbs_normalized = self._normalize_transform(rgbs)
         
         # Combine masks and RGB images
         input_implicit_segmentation = torch.cat([rgbs_normalized, masks], dim=1)

@@ -106,7 +106,7 @@ class ObjectSegmentationModel(nn.Module):
         
         # Stack the masks from the MobileSAM outputs
         masks = torch.stack([
-            output["masks"][torch.argmax(output["iou_predictions"])]
+            output["masks"][:, torch.argmax(output["iou_predictions"])]
             for output in mobile_sam_outputs
         ])
         
