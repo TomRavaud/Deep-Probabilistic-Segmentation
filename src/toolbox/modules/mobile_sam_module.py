@@ -50,8 +50,11 @@ class MobileSAM(nn.Module):
         Returns:
             torch.Tensor: Bounding box in the format [xmin, ymin, xmax, ymax]
         """
-        xmin, ymin = np.min(contours[0], axis=0)
-        xmax, ymax = np.max(contours[0], axis=0)
+        try:
+            xmin, ymin = np.min(contours[0], axis=0)
+            xmax, ymax = np.max(contours[0], axis=0)
+        except IndexError:
+            return torch.Tensor([0, 0, 0, 0])
         
         for contour in contours[1:]:
             

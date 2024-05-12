@@ -25,24 +25,24 @@ scene_sets_cfg:
 
     # List of scene sets configurations
     sets_cfg:
-      - name: webdataset.gso_1M
-        split_range: [0.0, 0.8]
+      - name: webdataset.gso_fake
+        split_range: [0.0, 1.0]
         n_repeats: 1  # Number of times to repeat the set
   
   val:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1M
-        split_range: [0.8, 0.9]
+      - name: webdataset.gso_fake
+        split_range: [0.0, 1.0]
         n_repeats: 1
   
   test:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1M
-        split_range: [0.9, 1.0]
+      - name: webdataset.gso_fake
+        split_range: [0.0, 1.0]
         n_repeats: 1
 
 # Dataset parameters

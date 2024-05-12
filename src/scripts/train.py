@@ -47,15 +47,6 @@ def train(cfg: DictConfig):
     # Get 1st data
     # batch = next(iter(datamodule.train_dataloader()))
     
-    
-    # print(batch.rgbs.shape,
-    #       len(batch.object_datas),
-    #       batch.bboxes.shape,
-    #       batch.TCO.shape,
-    #       batch.K.shape,
-    #       batch.depths,
-    #       "\n")
-    
     # # Visualize the data
     # for i in range(cfg.data.dataloader_cfg.batch_size):
         

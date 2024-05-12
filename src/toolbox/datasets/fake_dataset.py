@@ -101,7 +101,7 @@ class BatchSegmentationData:
         return self.rgbs.size(2), self.rgbs.size(3)
 
 
-class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
+class FakeObjectSegmentationDataset(torch.utils.data.IterableDataset):
     """
     Dataset on which a probabilistic segmentation model is trained. The task consists
     in predicting a probabilistic segmentation mask for a given object in an image given
@@ -319,7 +319,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         Returns:
             Union[SegmentationData, None]: Segmentation data or None if no valid object
         """
-        obs = ObjectSegmentationDataset._remove_invisible_objects(obs)
+        obs = FakeObjectSegmentationDataset._remove_invisible_objects(obs)
 
         start = time.time()
         timings = {}
@@ -387,11 +387,11 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         if len(valid_objects) == 0:
             return None
 
-        # Select the first object or a random object
-        if self._return_first_object:
-            object_data = valid_objects[0]
-        else:
-            object_data = random.sample(valid_objects, k=1)[0]
+        # Select the object named gso_Ecoforms_Plant_Bowl_Turquoise_7
+        for obj in valid_objects:
+            if obj.label == "gso_Ecoforms_Plant_Bowl_Turquoise_7":
+                object_data = obj
+                break
         
         assert object_data.bbox_modal is not None
 
@@ -412,7 +412,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         
         # Sample a random pose perturbation
         if random.random() <= self._pose_perturbation_prob:
-            DTO = ObjectSegmentationDataset._sample_random_pose_perturbation(
+            DTO = FakeObjectSegmentationDataset._sample_random_pose_perturbation(
                 bbox=object_data.bbox_modal,
                 K=obs.camera_data.K,
                 Z=TCO[2, 3],

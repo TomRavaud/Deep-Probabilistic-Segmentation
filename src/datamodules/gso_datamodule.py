@@ -9,6 +9,7 @@ from omegaconf import DictConfig, ListConfig
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import ObjectSegmentationDataset
+from toolbox.datasets.fake_dataset import FakeObjectSegmentationDataset
 from toolbox.datasets.make_sets import make_iterable_scene_set
 import toolbox.datasets.transformations as transformations
 
@@ -160,7 +161,7 @@ class GSODataModule(LightningDataModule):
             )
             
             # Datasets
-            self._data_train = ObjectSegmentationDataset(
+            self._data_train = FakeObjectSegmentationDataset(
                 scene_set_train,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,
@@ -168,7 +169,7 @@ class GSODataModule(LightningDataModule):
                 depth_augmentations=self._depth_augmentations,
                 **self.hparams.dataset_cfg,
             )
-            self._data_val = ObjectSegmentationDataset(
+            self._data_val = FakeObjectSegmentationDataset(
                 scene_set_val,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,
@@ -176,7 +177,7 @@ class GSODataModule(LightningDataModule):
                 depth_augmentations=self._depth_augmentations,
                 **self.hparams.dataset_cfg,
             )
-            self._data_test = ObjectSegmentationDataset(
+            self._data_test = FakeObjectSegmentationDataset(
                 scene_set_test,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,

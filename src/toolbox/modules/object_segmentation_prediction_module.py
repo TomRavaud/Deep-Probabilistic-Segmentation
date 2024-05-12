@@ -67,7 +67,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
         )
         
         if use_histograms:
-            self._implicit_segmentation_module = SegmentationWithHistograms(
+            self._segmentation_with_histograms = SegmentationWithHistograms(
                 output_dim=180,  # Hue values
             )
             # No need to normalize the RGB images (identity function)
@@ -76,14 +76,15 @@ class ObjectSegmentationPredictionModel(nn.Module):
         else:
             # Instantiate the ResNet18 module
             # (for implicit object segmentation prediction)
-            self._implicit_segmentation_module = ResNet18(
+            self._resnet18 = ResNet18(
                 output_dim=180,  # Hue values
                 nb_input_channels=4,  # 3 RGB channels + 1 mask channel
             ).to(device=self._device)
+            self._resnet18.eval()
             
             if compile:
-                self._implicit_segmentation_module =\
-                    torch.compile(self._implicit_segmentation_module)
+                self._resnet18 =\
+                    torch.compile(self._resnet18)
             
             self._normalize_transform = transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
@@ -135,7 +136,11 @@ class ObjectSegmentationPredictionModel(nn.Module):
         
         # Predict implicit object segmentations using the ResNet18 model or the
         # SegmentationWithHistograms module (histograms + Bayes)
-        implicit_segmentations = self._implicit_segmentation_module(
+        implicit_segmentation_module =\
+            self._resnet18 if hasattr(self, "_resnet18")\
+                else self._segmentation_with_histograms
+        
+        implicit_segmentations = implicit_segmentation_module(
             input_implicit_segmentation,
         )
         

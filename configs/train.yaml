@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - data: gso
+  - data: gso_fake
   - model: default
   - callbacks: default
   - logger: csv

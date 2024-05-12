@@ -110,16 +110,18 @@ class ObjectSegmentationModel(nn.Module):
             for output in mobile_sam_outputs
         ])
         
+        rgbs = x.rgbs
+        
         # Send images and masks to the device
-        x.rgbs = x.rgbs.to(device=self._device)
+        rgbs = rgbs.to(device=self._device)
         masks = masks.to(device=self._device)
         
         # Range [0, 255] -> [0, 1]
-        x.rgbs = x.rgbs.to(dtype=torch.float32)
-        x.rgbs /= 255.0
+        rgbs = rgbs.to(dtype=torch.float32)
+        rgbs /= 255.0
         
         # Normalize the RGB images
-        rgbs_normalized = self._normalize_transform(x.rgbs)
+        rgbs_normalized = self._normalize_transform(rgbs)
         
         # Combine masks and RGB images
         input_resnet = torch.cat([rgbs_normalized, masks], dim=1)
@@ -129,7 +131,7 @@ class ObjectSegmentationModel(nn.Module):
         
         # Generate the segmentation masks
         segmentation_masks = self._segmentation_mask_module(
-            x.rgbs,
+            rgbs,
             implicit_segmentations,
         )
         
