@@ -17,6 +17,7 @@ class ResNet18(nn.Module):
         self,
         output_dim: int = 1000,
         nb_input_channels: Optional[int] = None,
+        inference: bool = False,
     ) -> None:
         """Initialize a pretrained `ResNet18` module.
 
@@ -26,6 +27,8 @@ class ResNet18(nn.Module):
                 If None, the number of input channels is not fixed and can be set at
                 runtime. If not None, the number of input channels is fixed to the
                 specified value. Defaults to None.
+            inference (bool, optional): Whether to set the model in inference mode.
+                Defaults to False.
         """
         super(ResNet18, self).__init__()
         
@@ -62,6 +65,14 @@ class ResNet18(nn.Module):
                 out_features=output_dim,
                 bias=self._resnet18.fc.bias is not None,
             )
+
+        # Apply the sigmoid activation function to the output in inference mode only
+        # (not during training because it is applied in the loss function to ensure
+        # numerical stability)
+        if inference:
+            self._output_activation = nn.Sigmoid()
+        else:
+            self._output_activation = nn.Identity()
     
     def forward(
         self,
@@ -91,11 +102,8 @@ class ResNet18(nn.Module):
         
         x = self._resnet18.fc(x)
         
-        # Apply the sigmoid activation function to the output in evaluation mode only
-        # (not in training mode because it is applied in the loss function to ensure
-        # numerical stability)
-        if not self.training:
-            x = torch.sigmoid(x)
+        # Sigmoid or Identity activation function
+        x = self._output_activation(x)
         
         return x
 

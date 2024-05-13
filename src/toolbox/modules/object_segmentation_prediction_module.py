@@ -79,6 +79,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
             self._resnet18 = ResNet18(
                 output_dim=180,  # Hue values
                 nb_input_channels=4,  # 3 RGB channels + 1 mask channel
+                inference=True,
             ).to(device=self._device)
             self._resnet18.eval()
             
