@@ -24,6 +24,9 @@ class ObjectSegmentationModel(nn.Module):
             points along the object contour;
         2. A light Segment Anything Model (MobileSAM) for explicit object segmentation
             alignment;
+        
+        (1. and 2. can be abandoned if we use ground truth masks as explicit segmentation)
+        
         3. A ResNet18 model for implicit object segmentation prediction.
         4. A segmentation mask module for generating segmentation masks from the
             predicted implicit probabilistic object segmentation.
@@ -31,7 +34,8 @@ class ObjectSegmentationModel(nn.Module):
     def __init__(
         self,
         image_size: ListConfig,
-        sam_checkpoint: str,
+        use_gt_masks: bool = True,
+        sam_checkpoint: Optional[str] = None,
         object_set_cfg: Optional[DictConfig] = None,
         compile: bool = False,
     ) -> None:
@@ -52,22 +56,26 @@ class ObjectSegmentationModel(nn.Module):
                 std=[0.229, 0.224, 0.225],
         )
         
-        # Instantiate the contour rendering module
-        # (for rendering 3D objects, and extracting points along objects contour)
-        self._contour_rendering_module = ContourRendering(
-            object_set=object_set,
-            image_size=image_size,
-        )
+        self._use_gt_masks = use_gt_masks
         
-        # Instantiate the MobileSAM module
-        # (for explicit object segmentation alignment)
-        self._mobile_sam = MobileSAM(
-            sam_checkpoint=sam_checkpoint,
-            compile=compile,
-        )
-        # Freeze the MobileSAM parameters
-        for param in self._mobile_sam.parameters():
-            param.requires_grad = False
+        if not use_gt_masks:
+            # Instantiate the contour rendering module
+            # (for rendering 3D objects, and extracting points along objects contour)
+            self._contour_rendering_module = ContourRendering(
+                object_set=object_set,
+                image_size=image_size,
+                debug=True
+            )
+
+            # Instantiate the MobileSAM module
+            # (for explicit object segmentation alignment)
+            self._mobile_sam = MobileSAM(
+                sam_checkpoint=sam_checkpoint,
+                compile=compile,
+            )
+            # Freeze the MobileSAM parameters
+            for param in self._mobile_sam.parameters():
+                param.requires_grad = False
         
         # Instantiate the ResNet18 module
         # (for implicit object segmentation prediction)
@@ -98,18 +106,23 @@ class ObjectSegmentationModel(nn.Module):
         Returns:
             torch.Tensor: A tensor of predictions.
         """
-        # Render objects of the batch, extract outer contours points
-        contour_points_list = self._contour_rendering_module(x)
+        # Get object masks
+        if self._use_gt_masks:
+            masks = x.masks.unsqueeze(1)
+        else:
+            # Render objects of the batch, extract outer contours points
+            contour_points_list = self._contour_rendering_module(x)
+
+            # Predict masks, scores and logits using the MobileSAM model
+            mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
+
+            # Stack the masks from the MobileSAM outputs
+            masks = torch.stack([
+                output["masks"][:, torch.argmax(output["iou_predictions"])]
+                for output in mobile_sam_outputs
+            ])
         
-        # Predict masks, scores and logits using the MobileSAM model
-        mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
-        
-        # Stack the masks from the MobileSAM outputs
-        masks = torch.stack([
-            output["masks"][:, torch.argmax(output["iou_predictions"])]
-            for output in mobile_sam_outputs
-        ])
-        
+        # Get RGB images
         rgbs = x.rgbs
         
         # Send images and masks to the device
@@ -128,6 +141,8 @@ class ObjectSegmentationModel(nn.Module):
         
         # Predict implicit object segmentations using the ResNet18 model
         implicit_segmentations = self._resnet18(input_resnet)
+        
+        # TODO: Add some random noise the RGB images to make the segmentation model more robust
         
         # Generate the segmentation masks
         segmentation_masks = self._segmentation_mask_module(

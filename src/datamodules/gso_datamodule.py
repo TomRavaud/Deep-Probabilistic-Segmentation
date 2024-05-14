@@ -161,7 +161,7 @@ class GSODataModule(LightningDataModule):
             )
             
             # Datasets
-            self._data_train = FakeObjectSegmentationDataset(
+            self._data_train = ObjectSegmentationDataset(
                 scene_set_train,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,
@@ -169,7 +169,7 @@ class GSODataModule(LightningDataModule):
                 depth_augmentations=self._depth_augmentations,
                 **self.hparams.dataset_cfg,
             )
-            self._data_val = FakeObjectSegmentationDataset(
+            self._data_val = ObjectSegmentationDataset(
                 scene_set_val,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,
@@ -177,7 +177,7 @@ class GSODataModule(LightningDataModule):
                 depth_augmentations=self._depth_augmentations,
                 **self.hparams.dataset_cfg,
             )
-            self._data_test = FakeObjectSegmentationDataset(
+            self._data_test = ObjectSegmentationDataset(
                 scene_set_test,
                 resize_transform=self._resize_transform,
                 background_augmentations=self._background_augmentations,

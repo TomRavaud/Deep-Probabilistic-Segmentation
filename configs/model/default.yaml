@@ -16,6 +16,9 @@ scheduler:
 model:
   _target_: models.components.object_segmentation_model.ObjectSegmentationModel
 
+  # If set to true, the model will not render the object set nor use the MobileSAM model
+  use_gt_masks: true
+
   # Object set
   object_set_cfg:
     # Directory and name of the object set (3D models to render)
