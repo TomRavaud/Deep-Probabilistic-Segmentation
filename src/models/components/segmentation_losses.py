@@ -69,7 +69,7 @@ class FocalLoss(nn.Module):
     def __init__(
         self,
         gamma: float = 2,
-        alpha: float = 0.25,
+        alpha: float = 0.75,
         with_logits: bool = True,
     ) -> None:
         """Constructor of the class.
@@ -80,7 +80,7 @@ class FocalLoss(nn.Module):
                 focuses on hard examples. Defaults to 2.
             alpha (float, optional): A balancing parameter that determines the weight of
                 the positive class. The higher the value, the more the loss focuses on
-                the positive class. Defaults to 0.25.
+                the positive class. Defaults to 0.75.
             with_logits (bool, optional): A flag that determines if the input is passed
                 through a sigmoid function before computing the loss. Defaults to False.
         """
@@ -131,7 +131,7 @@ class FocalDiceCombinationLoss(nn.Module):
     def __init__(
         self,
         gamma: float = 2.0,
-        alpha: float = 0.25,
+        alpha: float = 0.75,
         smooth: float = 1.0,
         with_logits: bool = True,
         k_focal: float = 20.0,
@@ -145,7 +145,7 @@ class FocalDiceCombinationLoss(nn.Module):
                 loss focuses on hard examples. Defaults to 2.0.
             alpha (float, optional): A balancing parameter that determines the weight of
                 the positive class in the Focal loss. The higher the value, the more the
-                loss focuses on the positive class. Defaults to 0.25.
+                loss focuses on the positive class. Defaults to 0.75.
             smooth (float, optional): A smoothing factor used to prevent division by
                 zero and reduce the risk of overfitting in the Dice loss. The higher the
                 value, the smoother the loss. Defaults to 1.0.
