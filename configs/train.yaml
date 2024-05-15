@@ -3,7 +3,7 @@ defaults:
   - data: gso_1M
   - model: default
   - callbacks: default
-  - logger: csv
+  - logger: default
   - trainer: default
   - paths: default
   - extras: default
