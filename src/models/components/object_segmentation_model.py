@@ -14,11 +14,11 @@ from toolbox.datasets.make_sets import make_object_set
 from toolbox.modules.contour_rendering_module import ContourRendering
 from toolbox.modules.mobile_sam_module import MobileSAM
 from toolbox.modules.resnet18_module import ResNet18
-from toolbox.modules.segmentation_mask_module import SegmentationMask
 
 
 class ObjectSegmentationModel(nn.Module):
     """
+    TODO: update description
     This module is composed of four parts:
         1. A rendering stage that renders the object in a perturbed pose and extracts
             points along the object contour;
@@ -33,6 +33,7 @@ class ObjectSegmentationModel(nn.Module):
     """
     def __init__(
         self,
+        probabilistic_segmentation_model: nn.Module,
         image_size: ListConfig,
         use_gt_masks: bool = True,
         sam_checkpoint: Optional[str] = None,
@@ -44,26 +45,19 @@ class ObjectSegmentationModel(nn.Module):
         """
         super().__init__()
         
-        # Create the set of objects
-        object_set = make_object_set(**object_set_cfg)
-        
-        image_size = tuple(image_size)
-        
+        # Set the device
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        self._normalize_transform = transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
-                std=[0.229, 0.224, 0.225],
-        )
-        
-        self._use_gt_masks = use_gt_masks
-        
+         
         if not use_gt_masks:
+            
+            # Create the set of objects
+            object_set = make_object_set(**object_set_cfg)
+        
             # Instantiate the contour rendering module
             # (for rendering 3D objects, and extracting points along objects contour)
             self._contour_rendering_module = ContourRendering(
                 object_set=object_set,
-                image_size=image_size,
+                image_size=tuple(image_size),
                 debug=True
             )
 
@@ -77,24 +71,10 @@ class ObjectSegmentationModel(nn.Module):
             for param in self._mobile_sam.parameters():
                 param.requires_grad = False
         
-        # Instantiate the ResNet18 module
-        # (for implicit object segmentation prediction)
-        self._resnet18 = ResNet18(
-            output_dim=180,  # Hue values
-            nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-        ).to(device=self._device)
+        self._use_gt_masks = use_gt_masks
         
-        if compile:
-            self._resnet18 =\
-                torch.compile(self._resnet18)
-        
-        # Instantiate the segmentation mask module
-        # (for segmentation mask computation)
-        self._segmentation_mask_module = SegmentationMask()
-
-        if compile:
-            self._segmentation_mask_module =\
-                torch.compile(self._segmentation_mask_module)
+        self._probabilistic_segmentation_model = probabilistic_segmentation_model
+        self._probabilistic_segmentation_model.device = self._device
 
 
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
@@ -106,9 +86,9 @@ class ObjectSegmentationModel(nn.Module):
         Returns:
             torch.Tensor: A tensor of predictions.
         """
-        # Get object masks
+        # Get binary masks
         if self._use_gt_masks:
-            masks = x.masks.unsqueeze(1)
+            binary_masks = x.masks.unsqueeze(1)
         else:
             # Render objects of the batch, extract outer contours points
             contour_points_list = self._contour_rendering_module(x)
@@ -117,40 +97,25 @@ class ObjectSegmentationModel(nn.Module):
             mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
 
             # Stack the masks from the MobileSAM outputs
-            masks = torch.stack([
+            binary_masks = torch.stack([
                 output["masks"][:, torch.argmax(output["iou_predictions"])]
                 for output in mobile_sam_outputs
             ])
         
         # Get RGB images
-        rgbs = x.rgbs
+        rgb_images = x.rgbs
         
         # Send images and masks to the device
-        rgbs = rgbs.to(device=self._device)
-        masks = masks.to(device=self._device)
+        rgb_images = rgb_images.to(device=self._device)
+        binary_masks = binary_masks.to(device=self._device)
         
-        # Range [0, 255] -> [0, 1]
-        rgbs = rgbs.to(dtype=torch.float32)
-        rgbs /= 255.0
-        
-        # Normalize the RGB images
-        rgbs_normalized = self._normalize_transform(rgbs)
-        
-        # Combine masks and RGB images
-        input_resnet = torch.cat([rgbs_normalized, masks], dim=1)
-        
-        # Predict implicit object segmentations using the ResNet18 model
-        implicit_segmentations = self._resnet18(input_resnet)
-        
-        # TODO: Add some random noise the RGB images to make the segmentation model more robust
-        
-        # Generate the segmentation masks
-        segmentation_masks = self._segmentation_mask_module(
-            rgbs,
-            implicit_segmentations,
+        # Compute the probabilistic segmentation masks
+        probabilistic_masks = self._probabilistic_segmentation_model(
+            rgb_images,
+            binary_masks,
         )
         
-        return segmentation_masks
+        return probabilistic_masks
 
 
 if __name__ == "__main__":

@@ -125,6 +125,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
         rgbs = rgbs.to(device=self._device)
         masks = masks.to(device=self._device)
         
+        #NOTE: from here
         # Range [0, 255] -> [0, 1]
         rgbs = rgbs.to(dtype=torch.float32)
         rgbs /= 255.0
@@ -150,6 +151,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
             rgbs,
             implicit_segmentations,
         )
+        #NOTE: to here
         
         return segmentation_masks, masks
         

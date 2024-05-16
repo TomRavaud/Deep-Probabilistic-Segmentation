@@ -4,17 +4,30 @@ optimizer:
   _target_: torch.optim.Adam
   _partial_: true
   lr: 0.001
-  weight_decay: 0.0
+  weight_decay: 0.00001
 
 scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _target_: torch.optim.lr_scheduler.LinearLR
   _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 10
+  start_factor: 1.0
+  end_factor: 0.4
+  total_iters: 100
 
 model:
   _target_: models.components.object_segmentation_model.ObjectSegmentationModel
+
+  # probabilistic_segmentation_model:
+  #   _target_: toolbox.modules.probabilistic_segmentation_lookup.ProbabilisticSegmentationLookup
+  #   compile: false
+  #   use_histograms: false
+  #   inference: false
+  
+  probabilistic_segmentation_model:
+    _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
+    patch_size: 5
+    compile: false
+    inference: false
+
 
   # If set to true, the model will not render the object set nor use the MobileSAM model
   use_gt_masks: true
@@ -33,7 +46,23 @@ model:
   # Compile parts of the model for faster training with PyTorch 2.0
   compile: false
 
+
+# criterion:
+#   _target_: torch.nn.BCEWithLogitsLoss
+#   reduction: mean
+
 criterion:
-  # TODO: try focal loss and dice loss
-  _target_: torch.nn.BCEWithLogitsLoss
-  reduction: mean
+  _target_: models.components.segmentation_losses.FocalDiceCombinationLoss
+
+  # Focal loss parameters
+  gamma: 2.0  # Focusing parameter
+  alpha: 0.25  # Balancing parameter (percentage of negative samples)
+
+  # Dice loss parameters
+  smooth: 1.0  # Smoothing factor
+
+  with_logits: true  # If 'true', sigmoid activation is applied
+
+  # Weights for the Focal and Dice losses
+  k_focal: 20.0
+  k_dice: 1.0
