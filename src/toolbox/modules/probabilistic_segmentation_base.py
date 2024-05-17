@@ -25,7 +25,7 @@ class ProbabilisticSegmentationBase(nn.Module, ABC):
             rgb_images (torch.Tensor): Batch of RGB images (B, 3, H, W). Values should
                 be in the range [0, 255] and of type torch.uint8.
             binary_masks (torch.Tensor): Batch of binary masks (B, 1, H, W). Values should
-                be either 0 or 1 and of type torch.float32.
+                be either 0 or 1 and of type torch.float32, or of type torch.bool.
 
         Returns:
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
@@ -47,10 +47,10 @@ class ProbabilisticSegmentationBase(nn.Module, ABC):
                 "Input RGB images tensor is of incorrect type. "
                 f"Expected torch.uint8 but got {rgb_images.dtype}."
             )
-        elif binary_masks.dtype != torch.float32:
+        elif binary_masks.dtype != torch.float32 and binary_masks.dtype != torch.bool:
             raise ValueError(
                 "Input binary masks tensor is of incorrect type. "
-                f"Expected torch.float32 but got {binary_masks.dtype}."
+                f"Expected torch.float32 or torch.bool but got {binary_masks.dtype}."
             )
         elif rgb_images.size(1) != 3:
             raise ValueError(

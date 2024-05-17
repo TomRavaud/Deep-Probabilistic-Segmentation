@@ -15,10 +15,11 @@ import numpy as np
 # Custom modules
 from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.mobile_sam_module import MobileSAM
-from toolbox.modules.segmentation_mask_module import SegmentationMask
 from toolbox.modules.segmentation_with_histograms_module import (
     SegmentationWithHistograms
 )
+from toolbox.modules.probabilistic_segmentation_lookup import ProbabilisticSegmentationLookup
+from toolbox.modules.probabilistic_segmentation_mlp import ProbabilisticSegmentationMLP
 
 
 @dataclass
@@ -44,19 +45,20 @@ class ObjectSegmentationPredictionModel(nn.Module):
     """
     def __init__(
         self,
-        use_histograms: bool = False,
+        probabilistic_segmentation_model: nn.Module,
         compile: bool = False,
     ) -> None:
         """Constructor of the ObjectSegmentationPredictionModel.
 
         Args:
-            use_histograms (bool, optional): Whether to use histograms for
-                implicit object segmentation prediction. Defaults to False.
+            probabilistic_segmentation_model (nn.Module): Model that predicts
+                probabilistic segmentations.
             compile (bool, optional): Whether to compile parts of the model.
                 Defaults to False.
         """
         super().__init__()
         
+        # Set the device
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
         
         # Instantiate the MobileSAM module
@@ -66,39 +68,10 @@ class ObjectSegmentationPredictionModel(nn.Module):
             compile=compile,
         )
         
-        if use_histograms:
-            self._segmentation_with_histograms = SegmentationWithHistograms(
-                output_dim=180,  # Hue values
-            )
-            # No need to normalize the RGB images (identity function)
-            self._normalize_transform = lambda x: x
+        self._probabilistic_segmentation_model = probabilistic_segmentation_model
+        self._probabilistic_segmentation_model.device = self._device
         
-        else:
-            # Instantiate the ResNet18 module
-            # (for implicit object segmentation prediction)
-            self._resnet18 = ResNet18(
-                output_dim=180,  # Hue values
-                nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-                inference=True,
-            ).to(device=self._device)
-            self._resnet18.eval()
-            
-            if compile:
-                self._resnet18 =\
-                    torch.compile(self._resnet18)
-            
-            self._normalize_transform = transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
-                std=[0.229, 0.224, 0.225],
-            )
         
-        # Instantiate the segmentation mask module
-        # (for segmentation mask computation)
-        self._segmentation_mask_module = SegmentationMask()
-        if compile:
-            self._segmentation_mask_module =\
-                torch.compile(self._segmentation_mask_module)
-    
     @torch.no_grad()
     def forward(self, x: BatchInferenceData) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
@@ -114,46 +87,25 @@ class ObjectSegmentationPredictionModel(nn.Module):
         mobile_sam_outputs = self._mobile_sam(x, x.contour_points_list)
         
         # Stack the masks from the MobileSAM outputs
-        masks = torch.stack([
+        binary_masks = torch.stack([
             output["masks"][:, torch.argmax(output["iou_predictions"])]
             for output in mobile_sam_outputs
         ])
         
-        rgbs = x.rgbs
+        # Get RGB images
+        rgb_images = x.rgbs
         
         # Send images and masks to the device
-        rgbs = rgbs.to(device=self._device)
-        masks = masks.to(device=self._device)
+        rgb_images = rgb_images.to(device=self._device)
+        binary_masks = binary_masks.to(device=self._device)
         
-        #NOTE: from here
-        # Range [0, 255] -> [0, 1]
-        rgbs = rgbs.to(dtype=torch.float32)
-        rgbs /= 255.0
-        
-        # Normalize the RGB images
-        rgbs_normalized = self._normalize_transform(rgbs)
-        
-        # Combine masks and RGB images
-        input_implicit_segmentation = torch.cat([rgbs_normalized, masks], dim=1)
-        
-        # Predict implicit object segmentations using the ResNet18 model or the
-        # SegmentationWithHistograms module (histograms + Bayes)
-        implicit_segmentation_module =\
-            self._resnet18 if hasattr(self, "_resnet18")\
-                else self._segmentation_with_histograms
-        
-        implicit_segmentations = implicit_segmentation_module(
-            input_implicit_segmentation,
+        # Compute the probabilistic segmentation masks
+        probabilistic_masks = self._probabilistic_segmentation_model(
+            rgb_images,
+            binary_masks,
         )
         
-        # Generate the segmentation masks
-        segmentation_masks = self._segmentation_mask_module(
-            rgbs,
-            implicit_segmentations,
-        )
-        #NOTE: to here
-        
-        return segmentation_masks, masks
+        return probabilistic_masks, binary_masks
         
 
 class ObjectSegmentationPredictionModule(nn.Module):
@@ -161,14 +113,24 @@ class ObjectSegmentationPredictionModule(nn.Module):
     Module that predicts object segmentations using the
     ObjectSegmentationPredictionModel.
     """
-    def __init__(self, use_histograms: bool = False, compile: bool = False) -> None:
+    def __init__(
+        self,
+        probabilistic_segmentation_model: nn.Module,
+        compile: bool = False,
+    ) -> None:
         """
         Constructor of the ObjectSegmentationPredictionModule.
+        
+        Args:
+            probabilistic_segmentation_model (nn.Module): Model that predicts
+                probabilistic segmentations.
+            compile (bool, optional): Whether to compile parts of the model.
+                Defaults to False.
         """
         super().__init__()
         
         self._model = ObjectSegmentationPredictionModel(
-            use_histograms=use_histograms,
+            probabilistic_segmentation_model=probabilistic_segmentation_model,
             compile=compile,
         )
     

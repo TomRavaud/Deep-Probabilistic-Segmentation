@@ -1,5 +1,6 @@
 # Standard libraries
 from typing import Optional
+from functools import partial
 
 # Third-party libraries
 import torch
@@ -21,7 +22,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         patch_size: int = 5,
         compile: bool = False,
         device: Optional[torch.device] = None,
-        inference: bool = False,
+        output_logits: bool = True,
     ) -> None:
         """Constructor of the class.
         
@@ -31,16 +32,18 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
                 to False.
             device (torch.device, optional): Device on which to run the module. Defaults
                 to None.
-            inference (bool, optional): Whether to set the ResNet18 module in inference
-                mode. Defaults to False.
+            output_logits (bool, optional): Whether to output logits or probabilities.
+                Defaults to True.
         """
         super().__init__()
         
+        # Instantiate the model used to perform pixel-wise segmentation
         self._pixel_segmentation_template = PixelSegmentationMLP(
             patch_size=patch_size,
             nb_channels=3,  # RGB channels
+            output_logits=output_logits,
         ).to(device=device)
-
+        
         # Get the number of parameters of the pixel segmentation model
         nb_parameters_template = self._pixel_segmentation_template.nb_parameters
         
@@ -49,11 +52,11 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         self._resnet18 = ResNet18(
             output_dim=nb_parameters_template,
             nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-            inference=inference,
+            output_logits=True,  # True to get the weights and biases of the MLP
         ).to(device=device)
         
-        if inference:
-            self._resnet18.eval()
+        # if inference:
+        #     self._resnet18.eval()
         
         if compile:
             self._resnet18 =\
@@ -202,7 +205,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         
         # Predict as much weights and biases sets as the number of images in the batch
         pixel_segmentation_parameters = self._resnet18(input_implicit_segmentation)
-
+        
         # Initialize the output masks tensor
         probabilistic_masks = torch.empty(
             rgb_images.shape[0],
@@ -213,17 +216,38 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # TODO: Add some random noise the RGB images to make the segmentation model more robust
         # Compute the probabilistic mask for each image in the batch
         for i in range(rgb_images.shape[0]):
-
+            
             # Set the parameters of the template model with the i-th set of parameters
-            self._pixel_segmentation_template.set_model_parameters(
-                pixel_segmentation_parameters[i]
+            pixel_segmentation_model = partial(
+                self._pixel_segmentation_template,
+                parameters=pixel_segmentation_parameters[i],
             )
-
+            
             # Set the mask for the i-th image in the batch
             probabilistic_masks[i] = self._masks_by_model(
                 rgb_images[i].unsqueeze(0),
-                self._pixel_segmentation_template,
+                pixel_segmentation_model,
                 patch_size=self._patch_size,
             )
-
+        
         return probabilistic_masks
+
+
+if __name__ == "__main__":
+    
+    # Instantiate the model
+    probabilistic_segmentation_model = ProbabilisticSegmentationMLP(
+        patch_size=5,
+        compile=False,
+        device=torch.device("cuda:0"),
+    )
+    
+    # Create a random input tensor with appropriate shape
+    input_tensor = torch.randint(0, 256, (2, 3, 480, 640)).to(dtype=torch.uint8)
+    
+    # Create a random binary mask tensor with appropriate shape
+    mask_tensor = torch.randint(0, 2, (2, 1, 480, 640)).to(dtype=torch.float32)
+    
+    # Forward pass
+    output = probabilistic_segmentation_model(input_tensor, mask_tensor)
+    print("Output shape: ", output.shape)

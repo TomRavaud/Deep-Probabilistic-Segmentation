@@ -17,7 +17,7 @@ class ResNet18(nn.Module):
         self,
         output_dim: int = 1000,
         nb_input_channels: Optional[int] = None,
-        inference: bool = False,
+        output_logits: bool = True,
     ) -> None:
         """Initialize a pretrained `ResNet18` module.
 
@@ -27,8 +27,8 @@ class ResNet18(nn.Module):
                 If None, the number of input channels is not fixed and can be set at
                 runtime. If not None, the number of input channels is fixed to the
                 specified value. Defaults to None.
-            inference (bool, optional): Whether to set the model in inference mode.
-                Defaults to False.
+            output_logits (bool, optional): Whether to output logits or probabilities.
+                Defaults to True.
         """
         super(ResNet18, self).__init__()
         
@@ -69,10 +69,10 @@ class ResNet18(nn.Module):
         # Apply the sigmoid activation function to the output in inference mode only
         # (not during training because it is applied in the loss function to ensure
         # numerical stability)
-        if inference:
-            self._output_activation = nn.Sigmoid()
-        else:
+        if output_logits:
             self._output_activation = nn.Identity()
+        else:
+            self._output_activation = nn.Sigmoid()
     
     def forward(
         self,

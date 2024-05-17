@@ -25,7 +25,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         compile: bool = False,
         device: Optional[torch.device] = None,
         use_histograms: bool = False,
-        inference: bool = False,
+        output_logits: bool = True,
     ) -> None:
         """Constructor of the class.
 
@@ -36,8 +36,8 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
                 module. Defaults to None.
             use_histograms (bool, optional): If True, use histograms for implicit
                 object segmentation. Defaults to False.
-            inference (bool, optional): Whether to set the ResNet18 module in inference
-                mode. Defaults to False.
+            output_logits (bool, optional): Whether to output logits or probabilities.
+                Defaults to True.
         """
         super().__init__()
         
@@ -55,11 +55,11 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
             self._resnet18 = ResNet18(
                 output_dim=self.HUE_VALUES,
                 nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-                inference=inference,
+                output_logits=output_logits,
             ).to(device=device)
             
-            if inference:
-                self._resnet18.eval()
+            # if inference:
+            #     self._resnet18.eval()
             
             if compile:
                 self._resnet18 =\

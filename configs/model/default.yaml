@@ -20,13 +20,13 @@ model:
   #   _target_: toolbox.modules.probabilistic_segmentation_lookup.ProbabilisticSegmentationLookup
   #   compile: false
   #   use_histograms: false
-  #   inference: false
+  #   output_logits: true
   
   probabilistic_segmentation_model:
     _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
     patch_size: 5
     compile: false
-    inference: false
+    output_logits: true
 
 
   # If set to true, the model will not render the object set nor use the MobileSAM model
