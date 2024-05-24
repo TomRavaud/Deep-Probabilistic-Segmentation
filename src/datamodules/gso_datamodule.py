@@ -9,7 +9,6 @@ from omegaconf import DictConfig, ListConfig
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import ObjectSegmentationDataset
-from toolbox.datasets.fake_dataset import FakeObjectSegmentationDataset
 from toolbox.datasets.make_sets import make_iterable_scene_set
 import toolbox.datasets.transformations as transformations
 

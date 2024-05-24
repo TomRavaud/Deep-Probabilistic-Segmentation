@@ -45,9 +45,6 @@ class ObjectSegmentationModel(nn.Module):
         """
         super().__init__()
         
-        # Set the device
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-         
         if not use_gt_masks:
             
             # Create the set of objects
@@ -74,9 +71,8 @@ class ObjectSegmentationModel(nn.Module):
         self._use_gt_masks = use_gt_masks
         
         self._probabilistic_segmentation_model = probabilistic_segmentation_model
-        self._probabilistic_segmentation_model.device = self._device
-
-
+        
+        
     def forward(self, x: BatchSegmentationData) -> torch.Tensor:
         """Perform a single forward pass through the network.
 
@@ -104,10 +100,6 @@ class ObjectSegmentationModel(nn.Module):
         
         # Get RGB images
         rgb_images = x.rgbs
-        
-        # Send images and masks to the device
-        rgb_images = rgb_images.to(device=self._device)
-        binary_masks = binary_masks.to(device=self._device)
         
         # Compute the probabilistic segmentation masks
         probabilistic_masks = self._probabilistic_segmentation_model(

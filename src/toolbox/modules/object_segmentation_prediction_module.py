@@ -58,18 +58,21 @@ class ObjectSegmentationPredictionModel(nn.Module):
         """
         super().__init__()
         
+        # NOTE: device
         # Set the device
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+        # self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
         
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
         self._mobile_sam = MobileSAM(
-            sam_checkpoint="../weights/mobile_sam.pt",
+            sam_checkpoint="../weights/mobile_sam.ckpt",
             compile=compile,
         )
         
         self._probabilistic_segmentation_model = probabilistic_segmentation_model
-        self._probabilistic_segmentation_model.device = self._device
+        
+        # NOTE: device
+        # self._probabilistic_segmentation_model.device = self._device
         
         
     @torch.no_grad()
@@ -95,9 +98,10 @@ class ObjectSegmentationPredictionModel(nn.Module):
         # Get RGB images
         rgb_images = x.rgbs
         
+        # NOTE: device
         # Send images and masks to the device
-        rgb_images = rgb_images.to(device=self._device)
-        binary_masks = binary_masks.to(device=self._device)
+        # rgb_images = rgb_images.to(device=self._device)
+        # binary_masks = binary_masks.to(device=self._device)
         
         # Compute the probabilistic segmentation masks
         probabilistic_masks = self._probabilistic_segmentation_model(

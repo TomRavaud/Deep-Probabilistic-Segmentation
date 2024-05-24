@@ -3,7 +3,9 @@ _target_: lightning.pytorch.trainer.Trainer
 default_root_dir: ${paths.output_dir}
 
 min_epochs: 1  # prevents early stopping
-max_epochs: 200
+max_epochs: 100
+
+gradient_clip_val: 0.5
 
 accelerator: gpu
 devices: 1
@@ -26,6 +28,6 @@ benchmark: True
 
 # Set the number of batches to consider for a single epoch (be careful: it applies to
 # each dataloader individually)
-limit_train_batches: 500
-limit_val_batches: 50
-limit_test_batches: 50
+limit_train_batches: 200
+limit_val_batches: 20
+limit_test_batches: 20

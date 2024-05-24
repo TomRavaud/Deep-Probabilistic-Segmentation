@@ -81,8 +81,6 @@ def tarfile_samples(src, handler=reraise_exception):
     """
     streams = url_opener(src, handler=handler)
     
-    # NOTE: I could use the select_files parameter to split the samples into train,
-    # validation, and test sets. SAMPLE LEVEL SPLITTING.
     files = tar_file_expander(streams, handler=handler, select_files=None)
     samples = group_by_keys(files, handler=handler)
     

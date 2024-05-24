@@ -110,7 +110,12 @@ class PixelSegmentationMLP(nn.Module):
             start_idx = end_idx
 
             x = F.linear(x, weight, bias)
-            x = F.relu(x)
+            
+            # NOTE: Replace ReLU activation function with Leaky ReLU
+            # x = F.relu(x)
+            x = F.leaky_relu(x, negative_slope=0.01)
+            # x = F.sigmoid(x)
+            
             in_features = hidden_dim
         
         # Final output layer

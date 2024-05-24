@@ -25,7 +25,7 @@ scene_sets_cfg:
 
     # List of scene sets configurations
     sets_cfg:
-      - name: webdataset.gso_fake
+      - name: webdataset.gso_1K
         split_range: [0.0, 1.0]
         n_repeats: 1  # Number of times to repeat the set
   
@@ -33,7 +33,7 @@ scene_sets_cfg:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_fake
+      - name: webdataset.gso_1K
         split_range: [0.0, 1.0]
         n_repeats: 1
   
@@ -41,7 +41,7 @@ scene_sets_cfg:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_fake
+      - name: webdataset.gso_1K
         split_range: [0.0, 1.0]
         n_repeats: 1
 
@@ -49,8 +49,10 @@ scene_sets_cfg:
 dataset_cfg:
 
   # Minimum area of the modal bounding box of an object to be
-  # considered as a valid object
-  min_area: 10000
+  # considered as a valid object (should be consistent with the
+  # image size)
+  # min_area: 10000
+  min_area: 2500
 
   # Whether to choose the first valid object in the scene or a
   # random one
@@ -81,13 +83,14 @@ dataloader_cfg:
 transformations_cfg:
 
   # Resize the images to the specified size
-  resize: [480, 640]
+  resize: [240, 320]
+  # resize: [480, 640]
 
   # Probability of applying the augmentations
   augmentations_p: 0.8
 
   # Override the default RGB augmentations
-  rgb_augmentations: null
+  # rgb_augmentations: null
 
   # Override the default background augmentations
   background_augmentations: null

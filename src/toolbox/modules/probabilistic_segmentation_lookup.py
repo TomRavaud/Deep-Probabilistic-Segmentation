@@ -23,7 +23,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
     def __init__(
         self,
         compile: bool = False,
-        device: Optional[torch.device] = None,
         use_histograms: bool = False,
         output_logits: bool = True,
     ) -> None:
@@ -32,8 +31,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         Args:
             compile (bool, optional): Whether to compile the ResNet18 module. Defaults
                 to False.
-            device (Optional[torch.device], optional): Device on which to run the
-                module. Defaults to None.
             use_histograms (bool, optional): If True, use histograms for implicit
                 object segmentation. Defaults to False.
             output_logits (bool, optional): Whether to output logits or probabilities.
@@ -56,10 +53,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
                 output_dim=self.HUE_VALUES,
                 nb_input_channels=4,  # 3 RGB channels + 1 mask channel
                 output_logits=output_logits,
-            ).to(device=device)
-            
-            # if inference:
-            #     self._resnet18.eval()
+            )
             
             if compile:
                 self._resnet18 =\
@@ -69,29 +63,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
                 mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
                 std=[0.229, 0.224, 0.225],
             )
-
-        self._device = device
-    
-    @property
-    def device(self) -> torch.device:
-        """Return the device on which the module is running.
-
-        Returns:
-            torch.device: Device on which the module is running.
-        """
-        return self._device
-    
-    @device.setter
-    def device(self, device: torch.device) -> None:
-        """Set the device on which the module should run.
-
-        Args:
-            device (torch.device): Device on which the module should run.
-        """
-        self._device = device
-        
-        if hasattr(self, "_resnet18"):
-            self._resnet18.to(device=device)
     
     @staticmethod
     def _masks_by_lookup(
@@ -154,12 +125,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
                 are in the range [0, 1] and of type torch.float32.
         """
-        # Ensure that input tensors are on the same device as the module
-        if rgb_images.device != self._device:
-            rgb_images = rgb_images.to(device=self._device)
-        if binary_masks.device != self._device:
-            binary_masks = binary_masks.to(device=self._device)
-        
         # Convert [0, 255] -> [0.0, 1.0]
         rgb_images = rgb_images.to(dtype=torch.float32)
         rgb_images /= 255.0

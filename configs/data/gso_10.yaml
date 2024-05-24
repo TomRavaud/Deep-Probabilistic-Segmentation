@@ -25,31 +25,32 @@ scene_sets_cfg:
 
     # List of scene sets configurations
     sets_cfg:
-      - name: webdataset.gso_1M
-        split_range: [0.0, 0.8]
+      - name: webdataset.gso_10
+        split_range: [0.0, 1.0]
         n_repeats: 1  # Number of times to repeat the set
   
   val:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1M
-        split_range: [0.8, 0.9]
+      - name: webdataset.gso_10
+        split_range: [0.0, 1.0]
         n_repeats: 1
   
   test:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1M
-        split_range: [0.9, 1.0]
+      - name: webdataset.gso_10
+        split_range: [0.0, 1.0]
         n_repeats: 1
 
 # Dataset parameters
 dataset_cfg:
 
   # Minimum area of the modal bounding box of an object to be
-  # considered as a valid object
+  # considered as a valid object (should be consistent with the
+  # image size)
   # min_area: 10000
   min_area: 2500
 
@@ -72,8 +73,8 @@ dataset_cfg:
 
 # Dataloader parameters
 dataloader_cfg:
-  batch_size: 32
-  num_workers: 16
+  batch_size: 8
+  num_workers: 8
   pin_memory: True
   persistent_workers: True
 

@@ -29,11 +29,8 @@ class MobileSAM(nn.Module):
         # Choose the image encoder
         model_type = "vit_t"
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
         # Load the MobileSAM model and set it to evaluation mode
         self._mobile_sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
-        self._mobile_sam.to(device=device)
         self._mobile_sam.eval()
         
         if compile:
@@ -94,23 +91,18 @@ class MobileSAM(nn.Module):
         
         # Resize the images
         imgs = resize_transform.apply_image_torch(imgs)
-        # Send the images to the device
-        imgs = imgs.to(device=self._mobile_sam.device)
         
         # Compute the bounding boxes
         bboxes = torch.stack([
             MobileSAM._get_bboxes_from_contours(contour)
             for contour in contour_points_list
-        ])
+        ]).to(device=imgs.device)
         
         # Resize the bounding boxes
         bboxes = resize_transform.apply_boxes_torch(
             bboxes,
             original_size,
         )
-        
-        # Send the bounding boxes to the device
-        bboxes = bboxes.to(device=self._mobile_sam.device)
         
         # Prepare the (batched) input for the MobileSAM model
         batched_input = [

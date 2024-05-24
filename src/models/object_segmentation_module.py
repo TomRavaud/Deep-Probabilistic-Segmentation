@@ -10,38 +10,13 @@ from torchmetrics import MinMetric, MeanMetric
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 
 
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import numpy as np
+
+
 class ObjectSegmentationLitModule(LightningModule):
-    """A PyTorch Lightning module for object segmentation.
-
-    A `LightningModule` implements 8 key methods:
-
-    ```python
-    def __init__(self):
-    # Define initialization code here.
-
-    def setup(self, stage):
-    # Things to setup before each stage, 'fit', 'validate', 'test', 'predict'.
-    # This hook is called on every process when using DDP.
-
-    def training_step(self, batch, batch_idx):
-    # The complete training step.
-
-    def validation_step(self, batch, batch_idx):
-    # The complete validation step.
-
-    def test_step(self, batch, batch_idx):
-    # The complete test step.
-
-    def predict_step(self, batch, batch_idx):
-    # The complete predict step.
-
-    def configure_optimizers(self):
-    # Define and configure optimizers and LR schedulers.
-    ```
-
-    Docs:
-        https://lightning.ai/docs/pytorch/latest/common/lightning_module.html
-    """
+    
     def __init__(
         self,
         model: torch.nn.Module,
@@ -120,6 +95,46 @@ class ObjectSegmentationLitModule(LightningModule):
         )
 
         return loss
+    
+    def on_before_optimizer_step(self, optimizer) -> None:
+        
+        # def plot_grad_flow(named_parameters):
+        #     '''Plots the gradients flowing through different layers in the net during training.
+        #     Can be used for checking for possible gradient vanishing / exploding problems.
+
+        #     Usage: Plug this function in Trainer class after loss.backwards() as 
+        #     "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+        #     ave_grads = []
+        #     max_grads= []
+        #     layers = []
+
+        #     for n, p in named_parameters:
+        #         if(p.requires_grad) and ("bias" not in n):
+        #             layers.append(n)
+        #             ave_grads.append(p.grad.abs().mean().cpu())
+        #             max_grads.append(p.grad.abs().max().cpu())
+
+        #     # plt.clf()
+        #     plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+        #     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+        #     plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+        #     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+        #     plt.xlim(left=0, right=len(ave_grads))
+        #     # plt.ylim(bottom = -0.001, top=0.02) # zoom in on the lower gradient regions
+        #     plt.xlabel("Layers")
+        #     plt.ylabel("average gradient")
+        #     plt.title("Gradient flow")
+        #     plt.grid(True)
+        #     plt.legend([Line2D([0], [0], color="c", lw=4),
+        #                 Line2D([0], [0], color="b", lw=4),
+        #                 Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+        #     plt.savefig("grad_flow.png")
+        
+        # if self.trainer.global_step % 10 == 0:  # 1 batch out of 10
+            
+        #     plot_grad_flow(self._model.named_parameters())
+        pass
+            
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."

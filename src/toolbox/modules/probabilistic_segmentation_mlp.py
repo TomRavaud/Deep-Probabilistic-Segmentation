@@ -21,7 +21,6 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         self,
         patch_size: int = 5,
         compile: bool = False,
-        device: Optional[torch.device] = None,
         output_logits: bool = True,
     ) -> None:
         """Constructor of the class.
@@ -30,8 +29,6 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             patch_size (int, optional): Side length of the square patch. Defaults to 5.
             compile (bool, optional): Whether to compile the ResNet18 module. Defaults
                 to False.
-            device (torch.device, optional): Device on which to run the module. Defaults
-                to None.
             output_logits (bool, optional): Whether to output logits or probabilities.
                 Defaults to True.
         """
@@ -42,7 +39,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             patch_size=patch_size,
             nb_channels=3,  # RGB channels
             output_logits=output_logits,
-        ).to(device=device)
+        )
         
         # Get the number of parameters of the pixel segmentation model
         nb_parameters_template = self._pixel_segmentation_template.nb_parameters
@@ -53,7 +50,11 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             output_dim=nb_parameters_template,
             nb_input_channels=4,  # 3 RGB channels + 1 mask channel
             output_logits=True,  # True to get the weights and biases of the MLP
-        ).to(device=device)
+        )
+        
+        if output_logits:
+            # Load the weights of the ResNet18 module
+            self._resnet18.load_state_dict(torch.load("weights/resnet18.ckpt"))
         
         # if inference:
         #     self._resnet18.eval()
@@ -68,28 +69,6 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         )
 
         self._patch_size = patch_size
-        self._device = device
-    
-    @property
-    def device(self) -> torch.device:
-        """Return the device on which the module is running.
-
-        Returns:
-            torch.device: Device on which the module is running.
-        """
-        return self._device
-    
-    @device.setter
-    def device(self, device: torch.device) -> None:
-        """Set the device on which the module should run.
-
-        Args:
-            device (torch.device): Device on which the module should run.
-        """
-        self._device = device
-        
-        self._pixel_segmentation_template.to(device=device)
-        self._resnet18.to(device=device)
     
     @staticmethod
     def _images_to_patches(images: torch.Tensor, patch_size: int = 5) -> torch.Tensor:
@@ -153,7 +132,6 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             torch.Tensor: Predicted probabilistic masks (B, H, W).
         """
         # Extract the patches from the images
-        # patches = self._unfold(rgb_images)
         patches = ProbabilisticSegmentationMLP._images_to_patches(images, patch_size)
         
         # Predict the probability of each pixel being part of the foreground
@@ -185,23 +163,21 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
                 are in the range [0, 1] and of type torch.float32.
         """
-        # Ensure that input tensors are on the same device as the module
-        if rgb_images.device != self._device:
-            rgb_images = rgb_images.to(device=self._device)
-        if binary_masks.device != self._device:
-            binary_masks = binary_masks.to(device=self._device)
-        
         # Convert [0, 255] -> [0.0, 1.0]
         rgb_images = rgb_images.to(dtype=torch.float32)
         rgb_images /= 255.0
         
+        #NOTE:
+        # rgb_images_noisy = rgb_images + torch.randn_like(rgb_images) * 0.005
+        
         # Normalize RGB images
         rgb_images_normalized = self._normalize_transform(rgb_images)
+        #NOTE:
+        # rgb_images_noisy_normalized = self._normalize_transform(rgb_images_noisy)
         
         # Concatenate masks and RGB images
         input_implicit_segmentation =\
             torch.cat([rgb_images_normalized, binary_masks], dim=1)
-        
         
         # Predict as much weights and biases sets as the number of images in the batch
         pixel_segmentation_parameters = self._resnet18(input_implicit_segmentation)
@@ -211,9 +187,9 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             rgb_images.shape[0],
             rgb_images.shape[2],
             rgb_images.shape[3],
-        ).to(device=self._device)
-
-        # TODO: Add some random noise the RGB images to make the segmentation model more robust
+            device=rgb_images.device,
+        )
+        
         # Compute the probabilistic mask for each image in the batch
         for i in range(rgb_images.shape[0]):
             
@@ -223,9 +199,11 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
                 parameters=pixel_segmentation_parameters[i],
             )
             
+            # TODO: Add some random noise the RGB images to make the segmentation model more robust
+            
             # Set the mask for the i-th image in the batch
             probabilistic_masks[i] = self._masks_by_model(
-                rgb_images[i].unsqueeze(0),
+                rgb_images_normalized[i].unsqueeze(0),
                 pixel_segmentation_model,
                 patch_size=self._patch_size,
             )
@@ -239,7 +217,6 @@ if __name__ == "__main__":
     probabilistic_segmentation_model = ProbabilisticSegmentationMLP(
         patch_size=5,
         compile=False,
-        device=torch.device("cuda:0"),
     )
     
     # Create a random input tensor with appropriate shape

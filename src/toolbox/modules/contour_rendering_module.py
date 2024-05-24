@@ -34,7 +34,7 @@ class ContourRendering(nn.Module):
         super().__init__()
         
         self._object_set = object_set
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        
         self._image_size = image_size
         self._debug = debug
         
@@ -51,7 +51,7 @@ class ContourRendering(nn.Module):
         self._rasterizer = MeshRasterizer(
             cameras=None,
             raster_settings=raster_settings,
-        ).to(device=self._device)
+        )
         
         if not self._debug:
             
@@ -61,7 +61,7 @@ class ContourRendering(nn.Module):
             # Load the meshes (without textures)
             self._meshes = load_objs_as_meshes(files=mesh_paths,
                                                load_textures=False,
-                                               device=self._device)
+            )
 
             # In-place scaling of the vertices
             if object_set.scale is not None:
@@ -115,8 +115,8 @@ class ContourRendering(nn.Module):
 
             # Load the meshes (without textures)
             meshes = load_objs_as_meshes(files=mesh_paths,
-                                               load_textures=False,
-                                               device=self._device)
+                                         load_textures=False,
+            )
 
             # In-place scaling of the vertices
             if self._object_set.scale is not None:
@@ -128,6 +128,8 @@ class ContourRendering(nn.Module):
         else:
             object_set = self._object_set
             meshes = self._meshes
+        
+        meshes = meshes.to(device=x.rgbs.device)
         
         # Get the indexes of the objects in the object set that correspond to the
         # objects in the batch
@@ -148,7 +150,7 @@ class ContourRendering(nn.Module):
             tvec=tvec,
             camera_matrix=x.K,
             image_size=torch.Tensor(x.image_size).unsqueeze(0),
-        ).cuda()
+        ).to(device=x.rgbs.device)
         
         # Generate the depth map
         depth_maps = self._rasterizer(
