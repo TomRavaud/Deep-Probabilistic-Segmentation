@@ -44,6 +44,9 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # Get the number of parameters of the pixel segmentation model
         nb_parameters_template = self._pixel_segmentation_template.nb_parameters
         
+        # Attribute to store the parameters of the pixel segmentation model
+        self._pixel_segmentation_parameters = None
+        
         # Instantiate the ResNet18 module
         # (for MLP weights and biases prediction)
         self._resnet18 = ResNet18(
@@ -146,6 +149,78 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         
         return probabilistic_masks
     
+    def _apply_pixel_segmentation(
+        self,
+        rgb_images: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the probabilistic masks for the input images.
+
+        Args:
+            rgb_images (torch.Tensor): Batch of RGB images (B, C, H, W).
+
+        Returns:
+            torch.Tensor: Batch of probabilistic segmentation maps (B, H, W).
+        """
+        # Initialize the output masks tensor
+        probabilistic_masks = torch.empty(
+            rgb_images.shape[0],
+            rgb_images.shape[2],
+            rgb_images.shape[3],
+            device=rgb_images.device,
+        )
+        
+        # Ensure that the pixel segmentation parameters have been set
+        if self._pixel_segmentation_parameters is None:
+            raise ValueError(
+                "Pixel segmentation parameters have not been set. "
+                "Please run the forward method first."
+            )
+        
+        # Compute the probabilistic mask for each image in the batch
+        for i in range(rgb_images.shape[0]):
+            
+            # Set the parameters of the template model with the i-th set of parameters
+            pixel_segmentation_model = partial(
+                self._pixel_segmentation_template,
+                parameters=self._pixel_segmentation_parameters[i],
+            )
+            
+            # TODO: Add some random noise the RGB images to make the segmentation model more robust
+            
+            # Set the mask for the i-th image in the batch
+            probabilistic_masks[i] = self._masks_by_model(
+                rgb_images[i].unsqueeze(0),
+                pixel_segmentation_model,
+                patch_size=self._patch_size,
+            )
+        
+        return probabilistic_masks
+    
+    def _forward_pixel_segmentation(self, rgb_images: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the pixel segmentation model.
+
+        Args:
+            rgb_images (torch.Tensor): Batch of RGB images (B, 3, H, W). Values should
+                be in the range [0, 255] and of type torch.uint8.
+
+        Returns:
+            torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
+                are of type torch.float32.
+        """
+         # Convert [0, 255] -> [0.0, 1.0]
+        rgb_images = rgb_images.to(dtype=torch.float32)
+        rgb_images /= 255.0
+        
+        # Normalize RGB images
+        rgb_images_normalized = self._normalize_transform(rgb_images)
+        
+        # Compute the probabilistic masks for the input images
+        probabilistic_masks = self._apply_pixel_segmentation(
+            rgb_images_normalized,
+        )
+        
+        return probabilistic_masks
+
     def _forward(
         self,
         rgb_images: torch.Tensor,
@@ -178,35 +253,15 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # Concatenate masks and RGB images
         input_implicit_segmentation =\
             torch.cat([rgb_images_normalized, binary_masks], dim=1)
-        
+
         # Predict as much weights and biases sets as the number of images in the batch
-        pixel_segmentation_parameters = self._resnet18(input_implicit_segmentation)
+        self._pixel_segmentation_parameters =\
+            self._resnet18(input_implicit_segmentation)
         
-        # Initialize the output masks tensor
-        probabilistic_masks = torch.empty(
-            rgb_images.shape[0],
-            rgb_images.shape[2],
-            rgb_images.shape[3],
-            device=rgb_images.device,
+        # Compute the probabilistic masks for the input images
+        probabilistic_masks = self._apply_pixel_segmentation(
+            rgb_images_normalized,
         )
-        
-        # Compute the probabilistic mask for each image in the batch
-        for i in range(rgb_images.shape[0]):
-            
-            # Set the parameters of the template model with the i-th set of parameters
-            pixel_segmentation_model = partial(
-                self._pixel_segmentation_template,
-                parameters=pixel_segmentation_parameters[i],
-            )
-            
-            # TODO: Add some random noise the RGB images to make the segmentation model more robust
-            
-            # Set the mask for the i-th image in the batch
-            probabilistic_masks[i] = self._masks_by_model(
-                rgb_images_normalized[i].unsqueeze(0),
-                pixel_segmentation_model,
-                patch_size=self._patch_size,
-            )
         
         return probabilistic_masks
 

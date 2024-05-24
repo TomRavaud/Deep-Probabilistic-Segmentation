@@ -24,8 +24,9 @@ class ProbabilisticSegmentationBase(nn.Module, ABC):
         Args:
             rgb_images (torch.Tensor): Batch of RGB images (B, 3, H, W). Values should
                 be in the range [0, 255] and of type torch.uint8.
-            binary_masks (torch.Tensor): Batch of binary masks (B, 1, H, W). Values should
-                be either 0 or 1 and of type torch.float32, or of type torch.bool.
+            binary_masks (torch.Tensor): Batch of binary masks (B, 1, H, W). Values
+                should be either 0 or 1 and of type torch.float32, or of type
+                torch.bool.
 
         Returns:
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
@@ -83,7 +84,10 @@ class ProbabilisticSegmentationBase(nn.Module, ABC):
             )
         
         # Forward pass through the module
-        probabilistic_segmentations = self._forward(rgb_images, binary_masks)
+        probabilistic_segmentations = self._forward(
+            rgb_images,
+            binary_masks,
+        )
         
         # Check that the output tensor is of correct dimension, type and shape
         if probabilistic_segmentations.dim() != 3:
@@ -126,5 +130,80 @@ class ProbabilisticSegmentationBase(nn.Module, ABC):
         Returns:
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
                 are in the range [0, 1] and of type torch.float32.
+        """
+        pass
+    
+    def forward_pixel_segmentation(
+        self,
+        rgb_images: torch.Tensor,
+    ) -> torch.Tensor:
+        """Forward pass through the pixel segmentation model.
+
+        Args:
+            rgb_images (torch.Tensor): Batch of RGB images (B, 3, H, W). Values should
+                be in the range [0, 255] and of type torch.uint8.
+
+        Returns:
+            torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
+                are of type torch.float32.
+        """
+        # Check that the input tensors are of correct dimension, type and shape
+        if rgb_images.dim() != 4:
+            raise ValueError(
+                "Input RGB images tensor is of incorrect shape. "
+                f"Expected 4D tensor but got {rgb_images.dim()}D tensor."
+            )
+        elif rgb_images.dtype != torch.uint8:
+            raise ValueError(
+                "Input RGB images tensor is of incorrect type. "
+                f"Expected torch.uint8 but got {rgb_images.dtype}."
+            )
+        elif rgb_images.size(1) != 3:
+            raise ValueError(
+                "Input RGB images tensor is of incorrect shape. "
+                f"Expected tensor with 3 channels but got tensor with "
+                f"{rgb_images.size(1)} channels."
+            )
+        
+        # Forward pass through the module
+        probabilistic_segmentations = self._forward_pixel_segmentation(
+            rgb_images,
+        )
+        
+        # Check that the output tensor is of correct dimension, type and shape
+        if probabilistic_segmentations.dim() != 3:
+            raise ValueError(
+                "Output tensor is of incorrect shape. "
+                f"Expected 3D tensor but got {probabilistic_segmentations.dim()}D "
+                "tensor."
+            )
+        elif probabilistic_segmentations.dtype != torch.float32:
+            raise ValueError(
+                "Output tensor is of incorrect type. "
+                f"Expected torch.float32 but got {probabilistic_segmentations.dtype}."
+            )
+        elif probabilistic_segmentations.size(0) != rgb_images.size(0) or\
+            probabilistic_segmentations.size(1) != rgb_images.size(2) or\
+            probabilistic_segmentations.size(2) != rgb_images.size(3):
+            raise ValueError(
+                "Output tensor has incorrect shape. "
+                f"Expected tensor of shape {rgb_images.shape} but got "
+                f"{probabilistic_segmentations.shape}."
+            )
+
+        return probabilistic_segmentations
+    
+    @abstractmethod
+    def _forward_pixel_segmentation(
+        self,
+        rgb_images: torch.Tensor,
+    ) -> torch.Tensor:
+        """Forward pass through the pixel segmentation model.
+
+        Args:
+            rgb_images (torch.Tensor): Batch of RGB images (B, C, H, W).
+
+        Returns:
+            torch.Tensor: Batch of probabilistic segmentation maps (B, H, W).
         """
         pass

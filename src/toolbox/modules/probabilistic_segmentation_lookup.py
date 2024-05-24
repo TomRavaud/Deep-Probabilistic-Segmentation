@@ -63,6 +63,8 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
                 mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
                 std=[0.229, 0.224, 0.225],
             )
+        
+        self._implicit_segmentations = None
     
     @staticmethod
     def _masks_by_lookup(
@@ -108,6 +110,32 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         
         return probabilistic_masks
     
+    def _forward_pixel_segmentation(
+        self,
+        rgb_images: torch.Tensor,
+    ) -> torch.Tensor:
+        """Forward pass through the module for pixel segmentation only.
+        
+        Args:
+            rgb_images (torch.Tensor): Batch of RGB images (B, C, H, W). Values should
+                be in the range [0, 255] and of type torch.uint8.
+        
+        Returns:
+            torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
+                are in the range [0, 1] and of type torch.float32.
+        """
+        # Convert [0, 255] -> [0.0, 1.0]
+        rgb_images = rgb_images.to(dtype=torch.float32)
+        rgb_images /= 255.0
+        
+        # Generate the segmentation masks
+        probabilistic_masks = self._masks_by_lookup(
+            rgb_images,
+            self._implicit_segmentations,
+        )
+        
+        return probabilistic_masks
+    
     def _forward(
         self,
         rgb_images: torch.Tensor,
@@ -142,7 +170,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
             self._resnet18 if hasattr(self, "_resnet18")\
                 else self._segmentation_with_histograms
         
-        implicit_segmentations = implicit_segmentation_module(
+        self._implicit_segmentations = implicit_segmentation_module(
             input_implicit_segmentation,
         )
         
@@ -150,7 +178,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         # Generate the segmentation masks
         probabilistic_masks = self._masks_by_lookup(
             rgb_images,
-            implicit_segmentations,
+            self._implicit_segmentations,
         )
         
         return probabilistic_masks

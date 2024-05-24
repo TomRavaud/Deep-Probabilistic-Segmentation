@@ -1,5 +1,6 @@
 # Standard libraries
 from dataclasses import dataclass
+from typing import Optional
 import sys
 
 # Add the src directory to the system path
@@ -58,59 +59,72 @@ class ObjectSegmentationPredictionModel(nn.Module):
         """
         super().__init__()
         
-        # NOTE: device
-        # Set the device
-        # self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
-        
         # Instantiate the MobileSAM module
         # (for explicit object segmentation alignment)
         self._mobile_sam = MobileSAM(
             sam_checkpoint="../weights/mobile_sam.ckpt",
             compile=compile,
         )
+        self._binary_masks = None
         
         self._probabilistic_segmentation_model = probabilistic_segmentation_model
-        
-        # NOTE: device
-        # self._probabilistic_segmentation_model.device = self._device
-        
-        
+    
+    @property
+    def binary_masks(self) -> Optional[torch.Tensor]:
+        """Getter for the binary masks from the MobileSAM model.
+
+        Returns:
+            torch.Tensor: Binary masks from the MobileSAM model.
+        """
+        return self._binary_masks
+    
     @torch.no_grad()
-    def forward(self, x: BatchInferenceData) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        x: BatchInferenceData,
+        pixel_segmentation_only: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
 
         Args:
             x (BatchInferenceData): Input data for the model.
+            pixel_segmentation_only (bool, optional): Whether to use the previous
+                segmentation model to predict the pixel segmentation. Defaults to False.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Predicted segmentation masks and
-                masks from the MobileSAM model.
+            torch.Tensor: Predicted segmentation masks.
         """
-        # Predict masks, scores and logits using the MobileSAM model
-        mobile_sam_outputs = self._mobile_sam(x, x.contour_points_list)
-        
-        # Stack the masks from the MobileSAM outputs
-        binary_masks = torch.stack([
-            output["masks"][:, torch.argmax(output["iou_predictions"])]
-            for output in mobile_sam_outputs
-        ])
-        
         # Get RGB images
         rgb_images = x.rgbs
         
-        # NOTE: device
-        # Send images and masks to the device
-        # rgb_images = rgb_images.to(device=self._device)
-        # binary_masks = binary_masks.to(device=self._device)
+        if pixel_segmentation_only:
+            
+            self._binary_masks = None
+            
+            probabilistic_masks =\
+                self._probabilistic_segmentation_model.forward_pixel_segmentation(
+                    rgb_images,
+                )
+            return probabilistic_masks
         
-        # Compute the probabilistic segmentation masks
-        probabilistic_masks = self._probabilistic_segmentation_model(
-            rgb_images,
-            binary_masks,
-        )
-        
-        return probabilistic_masks, binary_masks
-        
+        else:
+            # Predict masks, scores and logits using the MobileSAM model
+            mobile_sam_outputs = self._mobile_sam(x, x.contour_points_list)
+
+            # Stack the masks from the MobileSAM outputs
+            self._binary_masks = torch.stack([
+                output["masks"][:, torch.argmax(output["iou_predictions"])]
+                for output in mobile_sam_outputs
+            ])
+            
+            # Compute the probabilistic segmentation masks
+            probabilistic_masks = self._probabilistic_segmentation_model(
+                rgb_images,
+                self._binary_masks,
+            )
+
+            return probabilistic_masks
+    
 
 class ObjectSegmentationPredictionModule(nn.Module):
     """
@@ -138,18 +152,32 @@ class ObjectSegmentationPredictionModule(nn.Module):
             compile=compile,
         )
     
+    @property
+    def model(self) -> ObjectSegmentationPredictionModel:
+        """Getter for the ObjectSegmentationPredictionModel.
+
+        Returns:
+            ObjectSegmentationPredictionModel: ObjectSegmentationPredictionModel.
+        """
+        return self._model
+    
     @torch.no_grad()
-    def forward(self, x: BatchInferenceData) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        x: BatchInferenceData,
+        pixel_segmentation_only: bool = False,
+    ) -> torch.Tensor:
         """Forward pass of the model.
 
         Args:
             x (BatchInferenceData): Input data for the model.
+            pixel_segmentation_only (bool, optional): Whether to use the previous
+                segmentation model to predict the pixel segmentation. Defaults to False.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Predicted segmentation masks and
-                masks from the MobileSAM model.
+            torch.Tensor: Predicted segmentation masks.
         """
-        return self._model(x)
+        return self._model(x, pixel_segmentation_only)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,6 @@ benchmark: True
 
 # Set the number of batches to consider for a single epoch (be careful: it applies to
 # each dataloader individually)
-limit_train_batches: 200
-limit_val_batches: 20
-limit_test_batches: 20
+limit_train_batches: 100
+limit_val_batches: 10
+limit_test_batches: 10
