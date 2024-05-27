@@ -15,7 +15,7 @@ class ResNet18(nn.Module):
     """
     def __init__(
         self,
-        output_dim: int = 1000,
+        output_dim: tuple = (1000,),
         nb_input_channels: Optional[int] = None,
         output_logits: bool = True,
     ) -> None:
@@ -57,12 +57,14 @@ class ResNet18(nn.Module):
                 bias=self._resnet18.conv1.bias,
             )
         
-        if output_dim != 1000:
-            # Replace the last fully-connected layer to have output_dim
+        output_size = sum(output_dim)
+        
+        if output_size != 1000:
+            # Replace the last fully-connected layer to have output_size
             # classes as output
             self._resnet18.fc = nn.Linear(
                 in_features=self._resnet18.fc.in_features,
-                out_features=output_dim,
+                out_features=output_size,
                 bias=self._resnet18.fc.bias is not None,
             )
 
@@ -73,6 +75,8 @@ class ResNet18(nn.Module):
             self._output_activation = nn.Identity()
         else:
             self._output_activation = nn.Sigmoid()
+        
+        self._output_dim = output_dim
     
     def forward(
         self,
@@ -105,6 +109,10 @@ class ResNet18(nn.Module):
         # Sigmoid or Identity activation function
         x = self._output_activation(x)
         
+        # Reshape the output to match the expected output shape
+        if len(self._output_dim) > 1:
+            x = x.view(-1, *self._output_dim)
+        
         return x
 
 
@@ -112,7 +120,7 @@ if __name__ == "__main__":
     
     torchinfo.summary(
         ResNet18(
-            output_dim=15,
+            output_dim=(15,),
             nb_input_channels=None,
         ),
         input_size=(32, 5, 224, 224),

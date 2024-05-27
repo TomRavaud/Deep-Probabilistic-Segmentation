@@ -50,7 +50,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # Instantiate the ResNet18 module
         # (for MLP weights and biases prediction)
         self._resnet18 = ResNet18(
-            output_dim=nb_parameters_template,
+            output_dim=(nb_parameters_template,),
             nb_input_channels=4,  # 3 RGB channels + 1 mask channel
             output_logits=True,  # True to get the weights and biases of the MLP
         )
