@@ -25,7 +25,7 @@ scene_sets_cfg:
 
     # List of scene sets configurations
     sets_cfg:
-      - name: webdataset.gso_1
+      - name: webdataset.gso_100
         split_range: [0.0, 1.0]
         n_repeats: 1  # Number of times to repeat the set
   
@@ -33,7 +33,7 @@ scene_sets_cfg:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1
+      - name: webdataset.gso_100
         split_range: [0.0, 1.0]
         n_repeats: 1
   
@@ -41,7 +41,7 @@ scene_sets_cfg:
     dir: ${paths.data_dir}
     sample_buffer_size: 200
     sets_cfg: 
-      - name: webdataset.gso_1
+      - name: webdataset.gso_100
         split_range: [0.0, 1.0]
         n_repeats: 1
 
@@ -73,7 +73,7 @@ dataset_cfg:
 
 # Dataloader parameters
 dataloader_cfg:
-  batch_size: 8
+  batch_size: 32
   num_workers: 8
   pin_memory: True
   persistent_workers: True

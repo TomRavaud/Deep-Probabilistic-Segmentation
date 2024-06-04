@@ -84,6 +84,23 @@ class ObjectSegmentationLitModule(LightningModule):
             batch.masks,
         )
         
+        # NOTE: debugging purposes
+        if self.trainer.global_step % 50 == 0:
+            idx = 0
+            gt = batch.masks[idx].cpu().detach().numpy()
+            pred = torch.sigmoid(segmentation_masks[idx]).cpu().detach().numpy()
+
+            plt.figure(figsize=(10, 5))
+            plt.subplot(1, 2, 1)
+            plt.imshow(gt)
+            plt.title("GT")
+            plt.subplot(1, 2, 2)
+            plt.imshow(pred)
+            plt.title("Pred")
+            plt.savefig("result_segmentation.png")
+            plt.close()
+
+
         # Update and log metric (average loss across batches)
         self._train_loss(loss)
         self.log(

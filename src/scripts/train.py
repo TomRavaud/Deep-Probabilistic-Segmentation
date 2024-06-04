@@ -103,6 +103,79 @@ def train(cfg: DictConfig):
 
         # model(batch)
     
+    # #TODO: to delete
+    # # NOTE: here, debugging
+    # model_to_test = model._model
+    
+    # # Set the model to evaluation mode in order to use running mean and var
+    # model_to_test.eval()
+    
+    # import matplotlib.pyplot as plt
+    # import numpy as np
+    # import torch
+    # from mpl_toolkits.axes_grid1 import make_axes_locatable
+    # from toolbox.datasets.segmentation_dataset import BatchSegmentationData
+    
+    # image = plt.imread("notebooks/images/rgb_im.png")
+
+    # # Remove the alpha channel if it exists
+    # if image.shape[-1] == 4:
+    #     image = image[..., :3]
+    
+    # # Convert [0, 1] to [0, 255] and to uint8
+    # image = (image * 255).astype(np.uint8)
+    
+    # mask = plt.imread("notebooks/images/mask.png")
+    # # Keep only the first channel
+    # mask = mask[..., 0]
+    # mask = torch.tensor(mask)
+    
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # input = BatchSegmentationData(
+    #     rgbs=torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(device),
+    #     masks=mask.unsqueeze(0).to(device),
+    #     object_datas=None,
+    #     bboxes=None,
+    #     TCO=None,
+    #     DTO=None,
+    #     K=None,
+    # )
+    
+    # pred = model_to_test(input)
+    # print(pred.shape)
+    
+    
+    # # pred = torch.sigmoid(pred).squeeze().cpu().detach().numpy()
+    
+    # # # Display the mask
+    # # fig, ax = plt.subplots()
+    # # divider = make_axes_locatable(ax)
+    # # cax = divider.append_axes("right", size="5%", pad=0.05)
+    # # img = ax.imshow(pred, cmap="magma")
+    # # ax.axis("off")
+    # # # Colorbar
+    # # fig.colorbar(img, cmap="magma", cax=cax)
+    # # plt.tight_layout()
+    # # # Save the figure
+    # # plt.savefig("pred_mask.png")
+    
+    # idx = 0
+    # gt = input.masks[idx].cpu().detach().numpy()
+    # pred = torch.sigmoid(pred[idx]).cpu().detach().numpy()
+
+    # plt.figure(figsize=(10, 5))
+    # plt.subplot(1, 2, 1)
+    # plt.imshow(gt)
+    # plt.title("GT")
+    # plt.subplot(1, 2, 2)
+    # plt.imshow(pred)
+    # plt.title("Pred")
+    # plt.savefig("pred_mask.png")
+    # plt.close()
+    
+    
+    
     train_metrics = trainer.callback_metrics
     
     if cfg.get("test"):

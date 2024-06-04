@@ -10,17 +10,10 @@ sys.path.append("src/")
 # Third party libraries
 import torch
 import torch.nn as nn
-from torchvision import transforms
 import numpy as np
 
 # Custom modules
-from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.mobile_sam_module import MobileSAM
-from toolbox.modules.segmentation_with_histograms_module import (
-    SegmentationWithHistograms
-)
-from toolbox.modules.probabilistic_segmentation_lookup import ProbabilisticSegmentationLookup
-from toolbox.modules.probabilistic_segmentation_mlp import ProbabilisticSegmentationMLP
 
 
 @dataclass

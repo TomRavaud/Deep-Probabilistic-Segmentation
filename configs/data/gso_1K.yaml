@@ -73,7 +73,7 @@ dataset_cfg:
 
 # Dataloader parameters
 dataloader_cfg:
-  batch_size: 8
+  batch_size: 32
   num_workers: 8
   pin_memory: True
   persistent_workers: True
@@ -90,7 +90,7 @@ transformations_cfg:
   augmentations_p: 0.8
 
   # Override the default RGB augmentations
-  # rgb_augmentations: null
+  rgb_augmentations: null
 
   # Override the default background augmentations
   background_augmentations: null

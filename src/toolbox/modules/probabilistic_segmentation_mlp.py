@@ -1,11 +1,11 @@
 # Standard libraries
-from typing import Optional
 from functools import partial
 
 # Third-party libraries
 import torch
 import torch.nn as nn
 from torchvision import transforms
+import matplotlib.pyplot as plt
 
 # Custom modules
 from toolbox.modules.probabilistic_segmentation_base import (
@@ -13,6 +13,7 @@ from toolbox.modules.probabilistic_segmentation_base import (
 )
 from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.pixel_segmentation_mlp_module import PixelSegmentationMLP
+from toolbox.utils.rgb2hsv_torch import rgb2hsv_torch
 
 
 class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
@@ -34,6 +35,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         """
         super().__init__()
         
+        # TODO: change nb_channels to 3
         # Instantiate the model used to perform pixel-wise segmentation
         self._pixel_segmentation_template = PixelSegmentationMLP(
             patch_size=patch_size,
@@ -55,9 +57,10 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             output_logits=True,  # True to get the weights and biases of the MLP
         )
         
-        if output_logits:
-            # Load the weights of the ResNet18 module
-            self._resnet18.load_state_dict(torch.load("weights/resnet18.ckpt"))
+        # TODO: to remove
+        # if output_logits:
+        #     # Load the weights of the ResNet18 module
+        #     self._resnet18.load_state_dict(torch.load("weights/resnet18.ckpt"))
         
         # if inference:
         #     self._resnet18.eval()
@@ -94,8 +97,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         images = nn.functional.pad(
             images,
             (padding_size,) * 4,
-            mode="constant",
-            value=0,
+            mode="replicate",
         )
 
         # Extract the patches from the images
@@ -105,7 +107,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # Permute the dimensions -> (B, H, W, C, patch_size, patch_size)
         patches = patches.permute(0, 2, 3, 1, 4, 5)
 
-        # Reshape the patches -> (B, HxW, C, patch_size * patch_size)
+        # Reshape the patches -> (B, HxW, C, patch_size, patch_size)
         patches = patches.contiguous().view(
             images.shape[0],
             -1,
@@ -240,7 +242,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         """
         # Convert [0, 255] -> [0.0, 1.0]
         rgb_images = rgb_images.to(dtype=torch.float32)
-        rgb_images /= 255.0
+        rgb_images /= 255.0 
         
         #NOTE:
         # rgb_images_noisy = rgb_images + torch.randn_like(rgb_images) * 0.005
@@ -258,6 +260,13 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         self._pixel_segmentation_parameters =\
             self._resnet18(input_implicit_segmentation)
         
+        # TODO: to remove
+        # Convert the rgb image to hsv
+        # hsv_images = rgb2hsv_torch(rgb_images)
+        # # Get only the hue channel
+        # hue_images = hsv_images[:, 0:1, :, :]
+        
+        # TODO: change hue_images to rgb_images_normalized
         # Compute the probabilistic masks for the input images
         probabilistic_masks = self._apply_pixel_segmentation(
             rgb_images_normalized,
