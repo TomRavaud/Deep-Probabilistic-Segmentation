@@ -5,7 +5,7 @@ defaults:
   - callbacks: default
   - logger: default
   - trainer: default
-  - paths: default
+  - paths: train
   - extras: default
   - hydra: default
 
