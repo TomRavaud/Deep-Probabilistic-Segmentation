@@ -13,14 +13,12 @@ from pytorch3d.utils import cameras_from_opencv_projection
 
 # Custom modules
 from toolbox.datasets.object_set import RigidObjectSet
-from toolbox.evaluation.sequence_segmentation_dataset import (
-    BatchSequenceSegmentationData,
-)
+from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 
 
 class MaskRendering(nn.Module):
     """
-    Module that renders 3D objects, extract their contours and sample points on them.
+    Module that renders 3D objects as binary masks.
     """
     def __init__(
         self,
@@ -28,7 +26,18 @@ class MaskRendering(nn.Module):
         image_size: Tuple[int, int],
         debug: bool = False,
     ) -> None:
-        
+        """Constructor.
+
+        Args:
+            object_set (RigidObjectSet): Object set containing the objects to render.
+            image_size (Tuple[int, int]): Size of the rendered masks.
+            debug (bool, optional): Flag to enable debug mode. If False, all the meshes
+                are loaded and scaled at the beginning. Defaults to False.
+
+        Raises:
+            NotImplementedError: Scaling the meshes to different scales is not
+                supported.
+        """
         super().__init__()
         
         self._object_set = object_set
@@ -70,14 +79,23 @@ class MaskRendering(nn.Module):
                 )
     
     @torch.no_grad()
-    def forward(self, x: BatchSequenceSegmentationData) -> Tuple:
-        
+    def forward(self, x: BatchSegmentationData) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (BatchSegmentationData): A batch of segmentation data.
+
+        Raises:
+            NotImplementedError: Scaling the meshes to different scales is not
+                supported.
+
+        Returns:
+            torch.Tensor: A tensor of masks.
+        """
         if self._debug:
             
-            # TODO: fix debug mode (object_datas, labels, batch_size)
-            
             # Create the set of labels to filter the objects
-            keep_labels = set(x.object_labels[i] for i in range(x.batch_size))
+            keep_labels = set(x.object_datas[i].label for i in range(x.batch_size))
 
             # Create a new temporary object set with only the objects of the batch
             object_set = self._object_set.filter_objects(keep_labels)
@@ -103,38 +121,27 @@ class MaskRendering(nn.Module):
         
         meshes = meshes.to(device=x.rgbs.device)
         
-        # TODO: take into account a batch size != 1
-        if x.batch_size != 1:
-            raise NotImplementedError(
-                "Batch sizes different from 1 are not supported yet."
-            )
-        
         # Get the indexes of the objects in the object set that correspond to the
         # objects in the batch
         batch_objects_idx = [
-            object_set.get_id_from_label(obj_label) for obj_label in x.object_labels
+            object_set.get_id_from_label(obj_data.label) for obj_data in x.object_datas
         ]
         
-        meshes = meshes[batch_objects_idx].extend(x.sequence_size)
-        
         # Rotation matrices and translation vectors
-        R = x.TCO[0, :, :3, :3]
-        tvec = x.TCO[0, :, :3, 3]
-        
-        # Expand the intrinsic camera matrix to the sequence size
-        K = x.K.expand(x.sequence_size, -1, -1)
+        R = x.TCO[:, :3, :3]
+        tvec = x.TCO[:, :3, 3]
         
         # Set the cameras
         cameras = cameras_from_opencv_projection(
             R=R,
             tvec=tvec,
-            camera_matrix=K,
+            camera_matrix=x.K,
             image_size=torch.Tensor(x.image_size).unsqueeze(0),
         ).to(device=x.rgbs.device)
         
         # Generate the depth map
         depth_maps = self._rasterizer(
-            meshes,
+            meshes[batch_objects_idx],
             cameras=cameras,
         ).zbuf[..., 0]
         

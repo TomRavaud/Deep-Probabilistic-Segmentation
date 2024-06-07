@@ -11,10 +11,12 @@ import cv2
 from toolbox.evaluation.sequence_segmentation_dataset import (
     BatchSequenceSegmentationData,
 )
+from toolbox.datasets.segmentation_dataset import BatchSegmentationData
+from toolbox.datasets.scene_set import ObjectData
 from toolbox.datasets.make_sets import make_object_set
 from toolbox.modules.contour_rendering_module import ContourRendering
 from toolbox.modules.mobile_sam_module import MobileSAM
-from toolbox.evaluation.mask_rendering_module import MaskRendering
+from toolbox.modules.mask_rendering_module import MaskRendering
 
 
 class SequenceSegmentationPredictionModel(nn.Module):
@@ -75,9 +77,28 @@ class SequenceSegmentationPredictionModel(nn.Module):
                 "Batch sizes different from 1 are not supported yet."
             )
         
-        # Compute the ground truth masks by rendering the objects
-        ground_truth_masks = self._mask_rendering_module(x)
+        batch_segmentation_data = BatchSegmentationData(
+            rgbs=x.rgbs[0],
+            masks=None,
+            object_datas=[
+                ObjectData(
+                    label=x.object_labels[0]
+                ) for _ in range(x.sequence_size)],
+            bboxes=None,
+            TCO=x.TCO[0],
+            DTO=None,
+            K=x.K.expand(x.sequence_size, -1, -1),
+            depths=None,
+        )
         
+        # Compute the ground truth masks by rendering the objects
+        ground_truth_masks = self._mask_rendering_module(batch_segmentation_data)
+        
+        # Get the sequence of RGB images
+        rgb_images = x.rgbs[0]
+        
+        print(ground_truth_masks.shape)
+        print(rgb_images.shape)
         
         # # Plot the first image of the sequence
         # img = x.rgbs[0, 0]
