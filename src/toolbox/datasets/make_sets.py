@@ -8,6 +8,7 @@ from omegaconf import ListConfig
 # Custom modules
 from toolbox.datasets.object_set import RigidObjectSet
 from toolbox.datasets.gso_object_set import GoogleScannedObjectSet
+from toolbox.datasets.bcot_object_set import BCOTObjectSet
 from toolbox.datasets.scene_set import (
     SceneSet,
     IterableMultiSceneSet,
@@ -43,6 +44,11 @@ def make_object_set(name: str, dir: str) -> RigidObjectSet:
         objset = GoogleScannedObjectSet(path, split="normalized")
     elif name == "gso.normalized_decimated":
         objset = GoogleScannedObjectSet(path, split="normalized_decimated")
+    
+    # BCOT models
+    elif name == "bcot":
+        objset = BCOTObjectSet(path)
+    
     else:
         raise ValueError(f"Unknown object set name: {name}")
     

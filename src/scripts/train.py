@@ -29,11 +29,14 @@ from toolbox.utils.utils import get_metric_value
 log = RankedLogger(__name__, rank_zero_only=True)
 
 
-def train(cfg: DictConfig):
+def train(cfg: DictConfig) -> tuple:
     """Perform training.
 
     Args:
         cfg (DictConfig): DictConfig object containing the configuration parameters.
+    
+    Returns:
+        tuple: Tuple containing the metric dictionary and the object dictionary.
     """
     # Set seed for random number generators in PyTorch, numpy and python.random
     if cfg.get("seed"):

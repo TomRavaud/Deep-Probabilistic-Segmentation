@@ -1,6 +1,6 @@
 # Standard libraries
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 # TODO: to remove
 import sys
@@ -18,7 +18,10 @@ from omegaconf import DictConfig
 
 # Custom modules
 from toolbox.evaluation.crop_resize_transform import CropResizeToAspectTransform
-from toolbox.evaluation.sequence_segmentation_dataset import SequenceSegmentationData
+from toolbox.evaluation.sequence_segmentation_dataset import (
+    SequenceSegmentationData,
+    BatchSequenceSegmentationData,
+)
 
 
 class BCOT(torch.utils.data.Dataset):
@@ -183,14 +186,14 @@ class BCOT(torch.utils.data.Dataset):
         with open(poses_file, "r") as f:
             lines = f.readlines()
         
-        poses = [
+        poses = np.array([
             np.array(lines[idx].strip("\t\n").split("\t"),
-                     dtype=np.float32).reshape(3, 4) for idx in images_idx
-        ]
-        poses = np.array(poses)
+                     dtype=np.float32) for idx in images_idx
+        ])
         
         # Store the ground truth poses
-        TCO[:, :3, :] = torch.tensor(poses)
+        TCO[:, :3, :3] = torch.tensor(poses[:, :9].reshape(-1, 3, 3))  # Rotation
+        TCO[:, :3, 3] = torch.tensor(poses[:, 9:].reshape(-1, 3))  # Translation
         
         # Retrive the camera intrinsics
         camera_intrinsics_file = self._sequences_frames_idx[idx][0].parents[1] / "K.txt"
@@ -218,6 +221,28 @@ class BCOT(torch.utils.data.Dataset):
             sample = self._resize_transform(sample)
         
         return sample
+    
+    @staticmethod
+    def collate_fn(
+        list_data: List[SequenceSegmentationData],
+    ) -> BatchSequenceSegmentationData:
+        """Collate a list of SegmentationData into a BatchSegmentationData. It replaces
+        the default collate_fn of the DataLoader to handle the custom data type.
+
+        Args:
+            list_data (List[SegmentationData]): List of SegmentationData.
+
+        Returns:
+            BatchSegmentationData: Batch of SegmentationData.
+        """
+        batch_data = BatchSequenceSegmentationData(
+            rgbs=torch.stack([d.rgbs for d in list_data]),
+            K=torch.stack([d.K for d in list_data]),
+            TCO=torch.stack([d.TCO for d in list_data]),
+            object_labels=[d.object_label for d in list_data],
+        )
+
+        return batch_data
 
 
 if __name__ == '__main__':

@@ -11,7 +11,7 @@ dataset:
   _target_: toolbox.evaluation.BCOT.BCOT
   root: ${paths.data_dir}/BCOT
   scenes_models_dict: null
-  frames_per_sequence: 5
+  frames_per_sequence: 20
   step_between_frames: 1
 
   # Parameters for the data transforms
@@ -24,3 +24,7 @@ shuffle: False
 num_workers: 8
 pin_memory: True
 persistent_workers: True
+
+collate_fn:
+  _target_: toolbox.evaluation.BCOT.BCOT.collate_fn
+  _partial_: true

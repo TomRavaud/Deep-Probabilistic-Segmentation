@@ -22,9 +22,32 @@ def evaluate(cfg: DictConfig):
     Args:
         cfg (DictConfig): DictConfig object containing the configuration parameters.
     """
+    # Set the device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Instantiate the dataloader
     dataloader: torch.utils.data.DataLoader = hydra.utils.instantiate(cfg.data)
     
-    print(dataloader)
+    # Instantiate the model
+    model: torch.nn.Module = hydra.utils.instantiate(cfg.model)
+    model.to(device)
+    
+    # batch = next(iter(dataloader))
+    # batch = batch.to(device)
+    
+    # loss = model(batch)
+    
+    # print(loss)
+    
+    for i, batch in enumerate(dataloader):
+        batch = batch.to(device)
+        
+        loss = model(batch)
+        
+        print(i)
+    
+    # for i, batch in enumerate(dataloader):
+    #     print(f"{batch.object_labels}")
     
     return
 

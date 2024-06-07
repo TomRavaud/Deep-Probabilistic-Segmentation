@@ -1,6 +1,7 @@
 defaults:
   - _self_
   - data: evaluate/bcot
+  - model: evaluate/bcot
   - paths: evaluate
   - hydra: default
 
