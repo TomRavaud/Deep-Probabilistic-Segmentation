@@ -1,5 +1,4 @@
 # Standard libraries
-from typing import List, Dict
 import random
 from copy import deepcopy
 
@@ -12,7 +11,6 @@ sys.path.append("src/")
 
 # Third-party libraries
 import numpy as np
-import PIL
 import torch
 from torchvision.transforms.functional import crop, resize
 

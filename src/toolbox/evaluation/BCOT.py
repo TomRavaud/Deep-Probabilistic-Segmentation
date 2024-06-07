@@ -14,6 +14,7 @@ import torch
 from torchvision import transforms
 import PIL
 import numpy as np
+from omegaconf import DictConfig
 
 # Custom modules
 from toolbox.evaluation.crop_resize_transform import CropResizeToAspectTransform
@@ -21,22 +22,43 @@ from toolbox.evaluation.sequence_segmentation_dataset import SequenceSegmentatio
 
 
 class BCOT(torch.utils.data.Dataset):
-    
+    """
+    BCOT dataset loading for segmentation evaluation.
+    """
     def __init__(
         self,
         root: str,
         scenes_models_dict: Optional[dict] = None,
         frames_per_sequence: int = 5,
         step_between_frames: int = 1,
-        resize_transform: Optional[CropResizeToAspectTransform] = None,
+        transformations_cfg: Optional[DictConfig] = None,
     ) -> None:
-        
+        """Constructor.
+
+        Args:
+            root (str): Path to the root directory of the dataset.
+            scenes_models_dict (Optional[dict], optional): Dictionary of scenes and
+                models to load. Defaults to None.
+            frames_per_sequence (int, optional): Number of frames per sequence to load.
+                Defaults to 5.
+            step_between_frames (int, optional): Step between frames to load. Defaults
+                to 1.
+            transformations_cfg (Optional[DictConfig], optional): Configuration for the
+                transformations to apply to the data. Defaults to None.
+        """
         self._root = Path(root)
         self._scenes_models_dict = scenes_models_dict
         self._frames_per_sequence = frames_per_sequence
         self._step_between_frames = step_between_frames
-        self._resize_transform = resize_transform
+        self._resize_transform = None
         
+        # Resize transform
+        if isinstance(transformations_cfg, DictConfig)\
+            and "resize" in transformations_cfg:
+            self._resize_transform = CropResizeToAspectTransform(
+                resize=transformations_cfg.resize
+            )
+
         # Initialize an empty dictionary to store the sequences and their corresponding
         # frames
         self._sequences_frames_idx = {}
@@ -44,8 +66,15 @@ class BCOT(torch.utils.data.Dataset):
         # Fill the dictionary with the sequences and their corresponding frames
         self._load_sequences()
         
-    def _load_sequences(self):
-        
+    def _load_sequences(self) -> None:
+        """Load the sequences of frames.
+
+        Raises:
+            ValueError: If the sequences and their corresponding frames have already
+                been loaded.
+            ValueError: If no scenes are found.
+            ValueError: If no models are found in a scene.
+        """
         if self._sequences_frames_idx:
             raise ValueError(
                 "The sequences and their corresponding frames have already been loaded."
@@ -109,12 +138,26 @@ class BCOT(torch.utils.data.Dataset):
                         self._sequences_frames_idx[len(self._sequences_frames_idx)] =\
                             sequence
                     
-    def __len__(self):
-        
+    def __len__(self) -> int:
+        """Get the number of sequences.
+
+        Returns:
+            int: Number of sequences.
+        """
         return len(self._sequences_frames_idx)
         
-    def __getitem__(self, idx):
-        
+    def __getitem__(self, idx: int) -> SequenceSegmentationData:
+        """Get the sequence of frames at the given index.
+
+        Args:
+            idx (int): Index of the sequence.
+
+        Raises:
+            ValueError: If no sequence is found at the given index.
+
+        Returns:
+            SequenceSegmentationData: Sequence of segmentation data.
+        """
         if idx not in self._sequences_frames_idx.keys():
             raise ValueError(f"No sequence found at index {idx}.")
         
@@ -123,6 +166,9 @@ class BCOT(torch.utils.data.Dataset):
             transforms.ToTensor()(PIL.Image.open(frame))
             for frame in self._sequences_frames_idx[idx]
         ])
+        
+        # Convert images from float32 to uint8
+        rgbs = (rgbs * 255).to(torch.uint8)
         
         # Get the indices of the frames in order to retrieve the associated
         # ground truth poses
@@ -176,14 +222,16 @@ class BCOT(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
     
+    import cv2
+    
     scenes_models_dict = {
-        "easy_static_trans": ["Ape", "Cat"],
-        "easy_static_suspension": ["Driller", "Tube"],
+        "easy_static_handheld": ["Ape", "Cat"],
     }
     
-    resize_transform = CropResizeToAspectTransform(
-        p=1.0,
-        resize=(256, 256),
+    transformations_cfg = DictConfig(
+        {
+            "resize": [240, 320],
+        }
     )
     
     dataset = BCOT(
@@ -191,9 +239,17 @@ if __name__ == '__main__':
         scenes_models_dict=scenes_models_dict,
         frames_per_sequence=10,
         step_between_frames=1,
-        resize_transform=resize_transform,
+        transformations_cfg=transformations_cfg,
     )
     
     print(len(dataset))
     print(dataset[0].rgbs.shape)
-    # print(dataset[1])
+     
+    img = dataset[0].rgbs[0]
+    img = img.permute(1, 2, 0).numpy()
+    
+    # Image to BGR
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    
+    cv2.imshow("Image", img)
+    cv2.waitKey(0)

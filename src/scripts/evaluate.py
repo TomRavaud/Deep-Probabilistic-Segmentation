@@ -8,18 +8,9 @@ sys.path.append("src/")
 # Third-party libraries
 import hydra
 from omegaconf import DictConfig
-# from lightning import (
-#     LightningDataModule,
-#     LightningModule,
-#     Trainer,
-#     Callback,
-#     seed_everything,
-# )
-# from lightning.pytorch.loggers import Logger
-# # import cv2
+import torch
 
 # # Custom modules
-# from toolbox.utils.pylogger import RankedLogger
 # from toolbox.utils.instantiators import instantiate_callbacks, instantiate_loggers
 # from toolbox.utils.logging_utils import log_hyperparameters
 # from toolbox.utils.utils import get_metric_value
@@ -31,6 +22,9 @@ def evaluate(cfg: DictConfig):
     Args:
         cfg (DictConfig): DictConfig object containing the configuration parameters.
     """
+    dataloader: torch.utils.data.DataLoader = hydra.utils.instantiate(cfg.data)
+    
+    print(dataloader)
     
     return
 

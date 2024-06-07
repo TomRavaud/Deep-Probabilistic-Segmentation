@@ -1,0 +1,26 @@
+# Class used to instantiate the DataLoader
+_target_: torch.utils.data.DataLoader
+
+#----------------------------------------------#
+# Parameters that are passed to the DataLoader #
+#----------------------------------------------#
+
+# Dataset
+dataset:
+
+  _target_: toolbox.evaluation.BCOT.BCOT
+  root: ${paths.data_dir}/BCOT
+  scenes_models_dict: null
+  frames_per_sequence: 5
+  step_between_frames: 1
+
+  # Parameters for the data transforms
+  transformations_cfg:
+    # Resize the images to the specified size
+    resize: [240, 320]
+
+batch_size: 1
+shuffle: False
+num_workers: 8
+pin_memory: True
+persistent_workers: True
