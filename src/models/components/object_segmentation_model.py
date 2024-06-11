@@ -4,16 +4,13 @@ from typing import Optional
 # Third-party libraries
 import torch
 from torch import nn
-from torchvision import transforms
 from omegaconf import DictConfig, ListConfig
-import numpy as np
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 from toolbox.datasets.make_sets import make_object_set
 from toolbox.modules.contour_rendering_module import ContourRendering
 from toolbox.modules.mobile_sam_module import MobileSAM
-from toolbox.modules.resnet18_module import ResNet18
 
 
 class ObjectSegmentationModel(nn.Module):
@@ -90,7 +87,7 @@ class ObjectSegmentationModel(nn.Module):
             contour_points_list = self._contour_rendering_module(x)
 
             # Predict masks, scores and logits using the MobileSAM model
-            mobile_sam_outputs = self._mobile_sam(x, contour_points_list)
+            mobile_sam_outputs = self._mobile_sam(x.rgbs, contour_points_list)
 
             # Stack the masks from the MobileSAM outputs
             binary_masks = torch.stack([

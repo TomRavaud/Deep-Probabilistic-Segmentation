@@ -182,9 +182,15 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         for i in range(rgb_images.shape[0]):
             
             # Set the parameters of the template model with the i-th set of parameters
+            # if available, otherwise use the first set of parameters
+            parameters = self._pixel_segmentation_parameters[i] \
+                if len(self._pixel_segmentation_parameters) > i \
+                else self._pixel_segmentation_parameters[0]
+            
+            # Create a partial function with the parameters
             pixel_segmentation_model = partial(
                 self._pixel_segmentation_template,
-                parameters=self._pixel_segmentation_parameters[i],
+                parameters=parameters,
             )
             
             # TODO: Add some random noise the RGB images to make the segmentation model more robust

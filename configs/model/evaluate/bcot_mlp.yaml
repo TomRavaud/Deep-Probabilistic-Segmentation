@@ -1,0 +1,31 @@
+# model:
+_target_: toolbox.evaluation.sequence_segmentation_prediction_module.SequenceSegmentationPredictionModel
+
+probabilistic_segmentation_model:
+  _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
+  patch_size: 5
+  compile: false
+  output_logits: false
+
+# Object set
+object_set_cfg:
+  # Directory and name of the object set (3D models to render)
+  dir: ${paths.data_dir}/BCOT/models
+  name: bcot
+
+image_size: ${data.dataset.transformations_cfg.resize}
+
+# Pretrained weights for the MobileSAM model
+sam_checkpoint: weights/mobile_sam.ckpt
+
+# Probabilistic segmentation model checkpoint
+segmentation_model_checkpoint: logs/train/runs/2024-06-04_05-05-27_mlp_10_classic_noaug/checkpoints/last.ckpt
+
+# Compile parts of the model for faster training with PyTorch 2.0
+compile: false
+
+# Error metric to use to evaluate the segmentation of the sequence
+error_metric:
+  # Intersection over Union
+  _target_: torchmetrics.JaccardIndex
+  task: binary

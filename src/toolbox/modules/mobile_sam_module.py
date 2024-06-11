@@ -10,9 +10,6 @@ from mobile_sam.utils.transforms import ResizeLongestSide
 import numpy as np
 import cv2
 
-# Custom modules
-from toolbox.datasets.segmentation_dataset import BatchSegmentationData
-
 
 class MobileSAM(nn.Module):
     """
@@ -70,12 +67,9 @@ class MobileSAM(nn.Module):
     @torch.no_grad()
     def forward(
         self,
-        x: BatchSegmentationData,
+        imgs: torch.Tensor,
         contour_points_list: list[Tuple],
     ) -> torch.Tensor:
-        
-        # Get RGB images from the batch
-        imgs = x.rgbs
         
         # Get the first image for visualization
         img = imgs[0]

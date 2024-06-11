@@ -32,23 +32,15 @@ def evaluate(cfg: DictConfig):
     model: torch.nn.Module = hydra.utils.instantiate(cfg.model)
     model.to(device)
     
-    batch = next(iter(dataloader))
-    batch = batch.to(device)
-    
-    loss = model(batch)
-    
-    print(loss)
-    
-    # for i, batch in enumerate(dataloader):
-    #     batch = batch.to(device)
+    # Go through the batches
+    for i, batch in enumerate(dataloader):
+        batch = batch.to(device)
         
-    #     loss = model(batch)
+        # Perform the forward pass
+        error = model(batch)
         
-    #     print(i)
-    
-    # for i, batch in enumerate(dataloader):
-    #     print(f"{batch.object_labels}")
-    
+        print(f"Sequence {i} {batch.object_labels}: {error}")
+        
     return
 
 

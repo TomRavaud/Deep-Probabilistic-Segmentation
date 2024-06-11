@@ -102,7 +102,7 @@ class ObjectSegmentationPredictionModel(nn.Module):
         
         else:
             # Predict masks, scores and logits using the MobileSAM model
-            mobile_sam_outputs = self._mobile_sam(x, x.contour_points_list)
+            mobile_sam_outputs = self._mobile_sam(x.rgbs, x.contour_points_list)
 
             # Stack the masks from the MobileSAM outputs
             self._binary_masks = torch.stack([

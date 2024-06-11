@@ -1,9 +1,10 @@
 # Standard libraries
-from typing import Optional
+from typing import Union
 
 # Third-party libraries
 import torch
 from torchvision import transforms
+from omegaconf import ListConfig
 
 # Custom modules
 from toolbox.modules.probabilistic_segmentation_base import (
@@ -22,7 +23,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         self,
         compile: bool = False,
         color_space: str = "rgb",
-        nb_bins: tuple = (10, 10, 10),
+        nb_bins: Union[ListConfig, tuple] = (10, 10, 10),
         use_histograms: bool = False,
         output_logits: bool = True,
     ) -> None:
@@ -39,7 +40,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         super().__init__()
         
         self._color_space = color_space
-        self._nb_bins = nb_bins
+        self._nb_bins = tuple(nb_bins)
         
         # Whether to use histograms or a ResNet18 for implicit object segmentation
         if use_histograms:
@@ -94,7 +95,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         Returns:
             torch.Tensor: Predicted probabilistic masks (B, H, W).
         """
-        # Convert RGB images to the right color space
         if color_space == "h":
             
             hsv_images = rgb2hsv_torch(rgb_images)
@@ -127,39 +127,63 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         elif color_space == "rgb":
             
             color_values = rgb_images
-            
+
             # Convert the bin sizes to a tensor
             nb_bins = torch.tensor(nb_bins, dtype=torch.long).to(rgb_images.device)
-            
+
             # Reshape the tensor of bin sizes to match the number of dimensions of the
             # color values tensor
             nb_bins = nb_bins.view(1, -1, 1, 1)
-            
+
             # Bin the color values
-            binned_color_values = (color_values * nb_bins).long()
-            
+            binned_color_values = ((color_values - 1e-6) * nb_bins).long()
+
+            B, C, H, W = binned_color_values.shape
+
+            # Initialize the probabilistic masks tensor
             probabilistic_masks = torch.empty(
-                (binned_color_values.shape[0],
-                 binned_color_values.shape[2],
-                 binned_color_values.shape[3]),
+                (B, H, W),
                 device=binned_color_values.device,
             )
-            
-            # TODO: replace by expand and gather
-            # Fill the probabilistic masks tensor
-            for i in range(probabilistic_masks.shape[0]):
-                for j in range(probabilistic_masks.shape[1]):
-                    for k in range(probabilistic_masks.shape[2]):
-                        
-                        a, b, c = binned_color_values[i, :, j, k]
-                        
-                        probabilistic_masks[i, j, k] =\
-                            implicit_segmentations[i, a, b, c]
-            
-            return probabilistic_masks
-            
+
+            # Create the batch indices
+            if implicit_segmentations.size(0) == B:
+                batch_indices = torch.arange(
+                    B,
+                    dtype=torch.int,
+                    device=binned_color_values.device,
+                ).view(B, 1, 1).expand(B, H, W)
+            elif implicit_segmentations.size(0) == 1:
+                batch_indices = torch.zeros(
+                    B,
+                    H,
+                    W,
+                    dtype=torch.int,
+                    device=binned_color_values.device,
+                )
+            else:
+                raise ValueError(
+                    "The number of implicit segmentations should be either 1 or equal"
+                    "to the batch size."
+                )
+
+            # Indices for each channel
+            a_indices = binned_color_values[:, 0, :, :]
+            b_indices = binned_color_values[:, 1, :, :]
+            c_indices = binned_color_values[:, 2, :, :]
+
+            # Use torch.gather to fetch the implicit segmentations
+            probabilistic_masks = implicit_segmentations[
+                batch_indices,
+                a_indices,
+                b_indices,
+                c_indices,
+            ]
+        
         else:
             raise ValueError(f"Unknown color space: {color_space}")
+        
+        return probabilistic_masks
         
     def _forward_pixel_segmentation(
         self,

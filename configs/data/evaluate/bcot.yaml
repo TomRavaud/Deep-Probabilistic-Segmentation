@@ -11,7 +11,7 @@ dataset:
   _target_: toolbox.evaluation.BCOT.BCOT
   root: ${paths.data_dir}/BCOT
   scenes_models_dict: null
-  frames_per_sequence: 20
+  frames_per_sequence: 10
   step_between_frames: 1
 
   # Parameters for the data transforms
