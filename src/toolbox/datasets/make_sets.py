@@ -9,6 +9,7 @@ from omegaconf import ListConfig
 from toolbox.datasets.object_set import RigidObjectSet
 from toolbox.datasets.gso_object_set import GoogleScannedObjectSet
 from toolbox.datasets.bcot_object_set import BCOTObjectSet
+from toolbox.datasets.rbot_object_set import RBOTObjectSet
 from toolbox.datasets.scene_set import (
     SceneSet,
     IterableMultiSceneSet,
@@ -48,6 +49,10 @@ def make_object_set(name: str, dir: str) -> RigidObjectSet:
     # BCOT models
     elif name == "bcot":
         objset = BCOTObjectSet(path)
+    
+    # RBOT models
+    elif name == "rbot":
+        objset = RBOTObjectSet(path)
     
     else:
         raise ValueError(f"Unknown object set name: {name}")

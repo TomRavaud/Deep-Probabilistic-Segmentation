@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - data: evaluate/bcot
-  - model: evaluate/bcot_mlp
+  - model: evaluate/bcot_histo
   - paths: evaluate
   - hydra: default
 

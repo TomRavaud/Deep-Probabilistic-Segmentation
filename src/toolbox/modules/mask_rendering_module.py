@@ -96,7 +96,7 @@ class MaskRendering(nn.Module):
             
             # Create the set of labels to filter the objects
             keep_labels = set(x.object_datas[i].label for i in range(x.batch_size))
-
+            
             # Create a new temporary object set with only the objects of the batch
             object_set = self._object_set.filter_objects(keep_labels)
 
