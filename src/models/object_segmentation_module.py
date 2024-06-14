@@ -85,7 +85,7 @@ class ObjectSegmentationLitModule(LightningModule):
         )
         
         # NOTE: debugging purposes
-        if self.trainer.global_step % 50 == 0:
+        if self.trainer.global_step % 300 == 0:
             idx = 0
             gt = batch.masks[idx].cpu().detach().numpy()
             pred = torch.sigmoid(segmentation_masks[idx]).cpu().detach().numpy()
@@ -239,7 +239,19 @@ class ObjectSegmentationLitModule(LightningModule):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
         
         if self.hparams.scheduler is not None:
-            scheduler = self.hparams.scheduler(optimizer=optimizer)
+            
+            # Manage multiple schedulers
+            if self.hparams.scheduler.main_scheduler is not None\
+                and self.hparams.scheduler.sub_schedulers is not None:
+                    sub_schedulers = [
+                        sub_scheduler(optimizer=optimizer)
+                        for sub_scheduler in self.hparams.scheduler.sub_schedulers
+                    ]
+                    scheduler = self.hparams.scheduler.main_scheduler(
+                        optimizer=optimizer,
+                        schedulers=sub_schedulers)
+            else:
+                scheduler = self.hparams.scheduler(optimizer=optimizer)
             
             return {
                 "optimizer": optimizer,

@@ -3,6 +3,7 @@ from typing import Union
 
 # Third-party libraries
 import torch
+import torch.nn as nn
 from torchvision import transforms
 from omegaconf import ListConfig
 
@@ -10,7 +11,6 @@ from omegaconf import ListConfig
 from toolbox.modules.probabilistic_segmentation_base import (
     ProbabilisticSegmentationBase
 )
-from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.segmentation_with_histograms_module import (
     SegmentationWithHistograms
 )
@@ -21,6 +21,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
     
     def __init__(
         self,
+        net: nn.Module,
         compile: bool = False,
         color_space: str = "rgb",
         nb_bins: Union[ListConfig, tuple] = (10, 10, 10),
@@ -30,8 +31,13 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         """Constructor of the class.
 
         Args:
-            compile (bool, optional): Whether to compile the ResNet18 module. Defaults
+            net (nn.Module): Neural network module for implicit object segmentation.
+            compile (bool, optional): Whether to compile the network. Defaults
                 to False.
+            color_space (str, optional): Color space of the input images. Defaults to
+                "rgb".
+            nb_bins (Union[ListConfig, tuple], optional): Number of bins for each color
+                channel. Defaults to (10, 10, 10).
             use_histograms (bool, optional): If True, use histograms for implicit
                 object segmentation. Defaults to False.
             output_logits (bool, optional): Whether to output logits or probabilities.
@@ -42,7 +48,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         self._color_space = color_space
         self._nb_bins = tuple(nb_bins)
         
-        # Whether to use histograms or a ResNet18 for implicit object segmentation
+        # Whether to use histograms or a network for implicit object segmentation
         if use_histograms:
             self._segmentation_with_histograms = SegmentationWithHistograms(
                 color_space=self._color_space,
@@ -52,17 +58,13 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
             self._normalize_transform = lambda x: x
         
         else:
-            # Instantiate the ResNet18 module
+            # Instantiate the network
             # (for implicit object segmentation prediction)
-            self._resnet18 = ResNet18(
-                output_dim=self._nb_bins,
-                nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-                output_logits=output_logits,
-            )
+            self._net = net(output_dim=self._nb_bins, output_logits=output_logits)
             
             if compile:
-                self._resnet18 =\
-                    torch.compile(self._resnet18)
+                self._net =\
+                    torch.compile(self._net)
             
             self._normalize_transform = transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
@@ -241,10 +243,10 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         input_implicit_segmentation =\
             torch.cat([rgb_images_normalized, binary_masks], dim=1)
         
-        # Predict implicit object segmentations using the ResNet18 model or the
+        # Predict implicit object segmentations using the network or the
         # SegmentationWithHistograms module (histograms + Bayes)
         implicit_segmentation_module =\
-            self._resnet18 if hasattr(self, "_resnet18")\
+            self._net if hasattr(self, "_net")\
                 else self._segmentation_with_histograms
         
         self._implicit_segmentations = implicit_segmentation_module(

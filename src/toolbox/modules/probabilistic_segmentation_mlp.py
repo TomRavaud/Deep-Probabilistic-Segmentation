@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from toolbox.modules.probabilistic_segmentation_base import (
     ProbabilisticSegmentationBase
 )
-from toolbox.modules.resnet18_module import ResNet18
 from toolbox.modules.pixel_segmentation_mlp_module import PixelSegmentationMLP
 from toolbox.utils.rgb2hsv_torch import rgb2hsv_torch
 
@@ -20,6 +19,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
     
     def __init__(
         self,
+        net_cls,
         patch_size: int = 5,
         compile: bool = False,
         output_logits: bool = True,
@@ -27,15 +27,18 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         """Constructor of the class.
         
         Args:
+            net_cls: Partial class to instantiate the network used to predict the
+                weights and biases of the MLP. Its arguments are supposed to be already
+                set, except for the output dimension which depends on the number of
+                parameters of the MLP.
             patch_size (int, optional): Side length of the square patch. Defaults to 5.
-            compile (bool, optional): Whether to compile the ResNet18 module. Defaults
+            compile (bool, optional): Whether to compile the network. Defaults
                 to False.
             output_logits (bool, optional): Whether to output logits or probabilities.
                 Defaults to True.
         """
         super().__init__()
         
-        # TODO: change nb_channels to 3
         # Instantiate the model used to perform pixel-wise segmentation
         self._pixel_segmentation_template = PixelSegmentationMLP(
             patch_size=patch_size,
@@ -49,25 +52,13 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         # Attribute to store the parameters of the pixel segmentation model
         self._pixel_segmentation_parameters = None
         
-        # Instantiate the ResNet18 module
+        # Instantiate the network
         # (for MLP weights and biases prediction)
-        self._resnet18 = ResNet18(
-            output_dim=(nb_parameters_template,),
-            nb_input_channels=4,  # 3 RGB channels + 1 mask channel
-            output_logits=True,  # True to get the weights and biases of the MLP
-        )
-        
-        # TODO: to remove
-        # if output_logits:
-        #     # Load the weights of the ResNet18 module
-        #     self._resnet18.load_state_dict(torch.load("weights/resnet18.ckpt"))
-        
-        # if inference:
-        #     self._resnet18.eval()
+        self._net = net_cls(output_dim=(nb_parameters_template,)) 
         
         if compile:
-            self._resnet18 =\
-                torch.compile(self._resnet18)
+            self._net =\
+                torch.compile(self._net)
         
         self._normalize_transform = transforms.Normalize(
             mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
@@ -264,15 +255,8 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
 
         # Predict as much weights and biases sets as the number of images in the batch
         self._pixel_segmentation_parameters =\
-            self._resnet18(input_implicit_segmentation)
+            self._net(input_implicit_segmentation)
         
-        # TODO: to remove
-        # Convert the rgb image to hsv
-        # hsv_images = rgb2hsv_torch(rgb_images)
-        # # Get only the hue channel
-        # hue_images = hsv_images[:, 0:1, :, :]
-        
-        # TODO: change hue_images to rgb_images_normalized
         # Compute the probabilistic masks for the input images
         probabilistic_masks = self._apply_pixel_segmentation(
             rgb_images_normalized,

@@ -3,27 +3,55 @@ _target_: models.object_segmentation_module.ObjectSegmentationLitModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0005
+  lr: 0.001
   weight_decay: 0.00001
 
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.LinearLR
+#   _partial_: true
+#   start_factor: 1.0
+#   end_factor: 0.5
+#   total_iters: 200
+
 scheduler:
-  _target_: torch.optim.lr_scheduler.LinearLR
-  _partial_: true
-  start_factor: 1.0
-  end_factor: 1.0
-  total_iters: 100
+  main_scheduler:
+    _target_: torch.optim.lr_scheduler.SequentialLR
+    _partial_: true 
+    milestones: [1]
+  
+  sub_schedulers:
+    - _target_: torch.optim.lr_scheduler.LinearLR
+      _partial_: true
+      start_factor: 0.0001
+      end_factor: 1.0
+    - _target_: torch.optim.lr_scheduler.MultiStepLR
+      _partial_: true
+      milestones: [150, 250, 350]
+      gamma: 0.5
 
 model:
   _target_: models.components.object_segmentation_model.ObjectSegmentationModel
 
   # probabilistic_segmentation_model:
   #   _target_: toolbox.modules.probabilistic_segmentation_lookup.ProbabilisticSegmentationLookup
+  #   net_cls:
+  #     _target_: toolbox.modules.simple_resnet_module.SimpleResNet
+  #     _partial_: true
+  #     version: 18
+  #     nb_input_channels: 4
   #   compile: false
   #   use_histograms: false
   #   output_logits: true
   
   probabilistic_segmentation_model:
     _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
+    net_cls:
+      _target_: toolbox.modules.simple_resnet_module.SimpleResNet
+      _partial_: true
+      version: 34
+      nb_input_channels: 4
+      output_logits: true
+
     patch_size: 5
     compile: false
     output_logits: true
