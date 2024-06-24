@@ -251,12 +251,15 @@ class RBOT(torch.utils.data.Dataset):
         
         # Get the object label
         object_label = self._sequences_frames_idx[idx][0].parents[1].name
+        # Get the scene label
+        scene_label = self._sequences_frames_idx[idx][0].name[:-8]
         
         sample = SequenceSegmentationData(
             rgbs=rgbs,
             TCO=TCO,
             K=K,
             object_label=object_label,
+            scene_label=scene_label,
         )
         
         if self._resize_transform is not None:
@@ -282,6 +285,7 @@ class RBOT(torch.utils.data.Dataset):
             K=torch.stack([d.K for d in list_data]),
             TCO=torch.stack([d.TCO for d in list_data]),
             object_labels=[d.object_label for d in list_data],
+            scene_labels=[d.scene_label for d in list_data],
         )
 
         return batch_data

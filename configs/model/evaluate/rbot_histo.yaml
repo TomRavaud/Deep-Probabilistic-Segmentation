@@ -31,3 +31,5 @@ error_metric:
   # Intersection over Union
   _target_: torchmetrics.JaccardIndex
   task: binary
+
+return_optimal_error: true

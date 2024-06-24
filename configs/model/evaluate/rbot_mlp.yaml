@@ -3,9 +3,16 @@ _target_: toolbox.evaluation.sequence_segmentation_prediction_module.SequenceSeg
 
 probabilistic_segmentation_model:
   _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
+  net_cls:
+    _target_: toolbox.modules.simple_resnet_module.SimpleResNet
+    _partial_: true
+    version: 34
+    nb_input_channels: 4
+    output_logits: true
+  
   patch_size: 5
   mlp_hidden_dims: [128, 64, 32]
-  apply_color_transformations: true
+  apply_color_transformations: false
   compile: false
   output_logits: false
 
@@ -21,7 +28,7 @@ image_size: ${data.dataset.transformations_cfg.resize}
 sam_checkpoint: weights/mobile_sam.ckpt
 
 # Probabilistic segmentation model checkpoint
-segmentation_model_checkpoint: logs/train/runs/2024-06-04_05-05-27_mlp_10_classic_noaug/checkpoints/last.ckpt
+segmentation_model_checkpoint: logs/train/runs/2024-06-17_03-59-31_mlp_1M_aug_noise_300_epochs/checkpoints/last.ckpt
 
 # Compile parts of the model for faster training with PyTorch 2.0
 compile: false
@@ -31,3 +38,5 @@ error_metric:
   # Intersection over Union
   _target_: torchmetrics.JaccardIndex
   task: binary
+
+return_optimal_error: false

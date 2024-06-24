@@ -10,7 +10,12 @@ dataset:
 
   _target_: toolbox.evaluation.RBOT.RBOT
   root: ${paths.data_dir}/RBOT
-  scenes_models_dict: null
+  scenes_models_dict:
+    a_regular: [ape, bakingsoda, benchviseblue, broccolisoup, cam, can, cat, clown, cube, driller, duck, eggbox, glue, iron, koalacandy, lamp, phone, squirrel]
+    b_dynamiclight: [ape, bakingsoda, benchviseblue, broccolisoup, cam, can, cat, clown, cube, driller, duck, eggbox, glue, iron, koalacandy, lamp, phone, squirrel]
+    c_noisy: [ape, bakingsoda, benchviseblue, broccolisoup, cam, can, cat, clown, cube, driller, duck, eggbox, glue, iron, koalacandy, lamp, phone, squirrel]
+
+
   frames_per_sequence: 10
   step_between_frames: 1
 

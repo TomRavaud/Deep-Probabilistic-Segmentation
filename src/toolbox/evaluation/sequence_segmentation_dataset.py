@@ -32,6 +32,8 @@ class SequenceSegmentationData:
     
     # Name of the object
     object_label: str
+    # Name of the scene
+    scene_label: str
 
 @dataclass
 class BatchSequenceSegmentationData:
@@ -56,6 +58,8 @@ class BatchSequenceSegmentationData:
     
     # Batch of object labels
     object_labels: List[str]
+    # Batch of scene labels
+    scene_labels: List[str]
 
     def pin_memory(self) -> BatchSequenceSegmentationData:
         """Pin memory for the batch.

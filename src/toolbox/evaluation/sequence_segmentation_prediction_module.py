@@ -31,6 +31,7 @@ class SequenceSegmentationPredictionModel(nn.Module):
         segmentation_model_checkpoint: Optional[str] = None,
         object_set_cfg: Optional[DictConfig] = None,
         error_metric: nn.Module = JaccardIndex(task="binary"),
+        return_optimal_error: bool = False,
         compile: bool = False,
     ) -> None:
         """Constructor.
@@ -48,6 +49,8 @@ class SequenceSegmentationPredictionModel(nn.Module):
             error_metric (nn.Module, optional): The error metric to use for the
                 evaluation of the probabilistic segmentation model. Defaults to
                 JaccardIndex(task="binary").
+            return_optimal_error (bool, optional): Whether to return the error of the
+                optimal segmentation mask. Defaults to False.
             compile (bool, optional): Whether to compile the MobileSAM module. Defaults
                 to False.
         """
@@ -97,6 +100,8 @@ class SequenceSegmentationPredictionModel(nn.Module):
             
         # Set the error metric
         self._error_metric = error_metric
+        
+        self._return_optimal_error = return_optimal_error
     
     @torch.no_grad()
     def forward(self, x: BatchSequenceSegmentationData) -> torch.Tensor:
@@ -138,62 +143,62 @@ class SequenceSegmentationPredictionModel(nn.Module):
         # Get the sequence of RGB images
         rgb_images = x.rgbs[0]
         
-        ####################
-        # Set the bounding boxes coordinates for each frame of the sequence
-        contour_points_list = []
-        
-        for i in range(x.sequence_size):
-            
-            indices = torch.nonzero(ground_truth_masks[i])
-            
-            if len(indices) == 0:
-                raise ValueError(f"No object pixels found in frame {i}.")
-            
-            min_coords, _ = torch.min(indices, dim=0)
-            max_coords, _ = torch.max(indices, dim=0)
+        if self._return_optimal_error:
+            # Set the bounding boxes coordinates for each frame of the sequence
+            contour_points_list = []
 
-            bbox = torch.tensor([
-                min_coords[1].item(),
-                min_coords[0].item(),
-                max_coords[1].item(),
-                max_coords[0].item(),
-            ])
+            for i in range(x.sequence_size):
+
+                indices = torch.nonzero(ground_truth_masks[i])
+
+                if len(indices) == 0:
+                    raise ValueError(f"No object pixels found in frame {i}.")
+
+                min_coords, _ = torch.min(indices, dim=0)
+                max_coords, _ = torch.max(indices, dim=0)
+
+                bbox = torch.tensor([
+                    min_coords[1].item(),
+                    min_coords[0].item(),
+                    max_coords[1].item(),
+                    max_coords[0].item(),
+                ])
+
+                # Set the MobileSAM expected input
+                contour_points_list.append([np.array(bbox).reshape(-1, 2),])
+        else:
+            # Get the first ground truth mask
+            first_ground_truth_mask = ground_truth_masks[0]
+
+            # Set the bounding box coordinates for the first frame of the sequence
+            indices = torch.nonzero(first_ground_truth_mask)
+
+            if len(indices) == 0:
+                raise ValueError("No object pixels found in the first frame.")
+            else:
+                min_coords, _ = torch.min(indices, dim=0)
+                max_coords, _ = torch.max(indices, dim=0)
+
+                bbox = torch.tensor([
+                    min_coords[1].item(),
+                    min_coords[0].item(),
+                    max_coords[1].item(),
+                    max_coords[0].item(),
+                ])
 
             # Set the MobileSAM expected input
-            contour_points_list.append([np.array(bbox).reshape(-1, 2),])
-        ####################
+            contour_points_list=[
+                # First example of the batch
+                [np.array(bbox).reshape(-1, 2),],
+                # Second example of the batch...
+            ]
         
-        # Get the first image of the sequence
-        # first_image = rgb_images[0:1]
-        
-        # Get the first ground truth mask
-        # first_ground_truth_mask = ground_truth_masks[0]
-        
-        # Set the bounding box coordinates for the first frame of the sequence
-        # indices = torch.nonzero(first_ground_truth_mask)
-        
-        # if len(indices) == 0:
-        #     raise ValueError("No object pixels found in the first frame.")
-        # else:
-        #     min_coords, _ = torch.min(indices, dim=0)
-        #     max_coords, _ = torch.max(indices, dim=0)
-            
-        #     bbox = torch.tensor([
-        #         min_coords[1].item(),
-        #         min_coords[0].item(),
-        #         max_coords[1].item(),
-        #         max_coords[0].item(),
-        #     ])
-        
-        # Set the MobileSAM expected input
-        # contour_points_list=[
-        #     # First example of the batch
-        #     [np.array(bbox).reshape(-1, 2),],
-        #     # Second example of the batch...
-        # ]
-        
-        # Predict the masks for the sequence
-        mobile_sam_outputs = self._mobile_sam(rgb_images, contour_points_list)
+        if self._return_optimal_error:
+            # Predict the masks for the sequence
+            mobile_sam_outputs = self._mobile_sam(rgb_images, contour_points_list)
+        else:
+            # Predict the mask for the first image
+            mobile_sam_outputs = self._mobile_sam(rgb_images[0:1], contour_points_list)
         
         # Stack the mask(s) from the MobileSAM outputs
         binary_masks = torch.stack([
@@ -227,10 +232,13 @@ class SequenceSegmentationPredictionModel(nn.Module):
             target=ground_truth_masks,
         )
         
-        optimal_error = self._error_metric(
-            preds=binary_masks[:, 0, ...],
-            target=ground_truth_masks,
-        )
+        if self._return_optimal_error:
+            optimal_error = self._error_metric(
+                preds=binary_masks[:, 0, ...],
+                target=ground_truth_masks,
+            )
+        else:
+            optimal_error = None
         
         ##### Debugging #####
         # # Plot the first image of the sequence

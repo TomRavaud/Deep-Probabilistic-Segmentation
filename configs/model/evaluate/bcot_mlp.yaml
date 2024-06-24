@@ -3,9 +3,16 @@ _target_: toolbox.evaluation.sequence_segmentation_prediction_module.SequenceSeg
 
 probabilistic_segmentation_model:
   _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
+  net_cls:
+    _target_: toolbox.modules.simple_resnet_module.SimpleResNet
+    _partial_: true
+    version: 34
+    nb_input_channels: 4
+    output_logits: true
+  
   patch_size: 5
   mlp_hidden_dims: [128, 64, 32]
-  apply_color_transformations: true
+  apply_color_transformations: false
   compile: false
   output_logits: false
 
