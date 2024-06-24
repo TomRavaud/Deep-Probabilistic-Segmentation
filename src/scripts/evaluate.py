@@ -37,9 +37,10 @@ def evaluate(cfg: DictConfig):
         batch = batch.to(device)
         
         # Perform the forward pass
-        error = model(batch)
+        error, optimal_error = model(batch)
         
         print(f"Sequence {i} {batch.object_labels}: {error}")
+        print(f"Optimal error: {optimal_error}")
         
     return
 

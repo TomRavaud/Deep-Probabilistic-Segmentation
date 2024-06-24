@@ -138,37 +138,62 @@ class SequenceSegmentationPredictionModel(nn.Module):
         # Get the sequence of RGB images
         rgb_images = x.rgbs[0]
         
-        # Get the first image of the sequence
-        first_image = rgb_images[0:1]
+        ####################
+        # Set the bounding boxes coordinates for each frame of the sequence
+        contour_points_list = []
         
-        # Get the first ground truth mask
-        first_ground_truth_mask = ground_truth_masks[0]
-        
-        # Set the bounding box coordinates for the first frame of the sequence
-        indices = torch.nonzero(first_ground_truth_mask)
-        
-        if len(indices) == 0:
-            raise ValueError("No object pixels found in the first frame.")
-        else:
+        for i in range(x.sequence_size):
+            
+            indices = torch.nonzero(ground_truth_masks[i])
+            
+            if len(indices) == 0:
+                raise ValueError(f"No object pixels found in frame {i}.")
+            
             min_coords, _ = torch.min(indices, dim=0)
             max_coords, _ = torch.max(indices, dim=0)
-            
+
             bbox = torch.tensor([
                 min_coords[1].item(),
                 min_coords[0].item(),
                 max_coords[1].item(),
                 max_coords[0].item(),
             ])
+
+            # Set the MobileSAM expected input
+            contour_points_list.append([np.array(bbox).reshape(-1, 2),])
+        ####################
+        
+        # Get the first image of the sequence
+        # first_image = rgb_images[0:1]
+        
+        # Get the first ground truth mask
+        # first_ground_truth_mask = ground_truth_masks[0]
+        
+        # Set the bounding box coordinates for the first frame of the sequence
+        # indices = torch.nonzero(first_ground_truth_mask)
+        
+        # if len(indices) == 0:
+        #     raise ValueError("No object pixels found in the first frame.")
+        # else:
+        #     min_coords, _ = torch.min(indices, dim=0)
+        #     max_coords, _ = torch.max(indices, dim=0)
+            
+        #     bbox = torch.tensor([
+        #         min_coords[1].item(),
+        #         min_coords[0].item(),
+        #         max_coords[1].item(),
+        #         max_coords[0].item(),
+        #     ])
         
         # Set the MobileSAM expected input
-        contour_points_list=[
-            # First example of the batch
-            [np.array(bbox).reshape(-1, 2),],
-            # Second example of the batch...
-        ]
+        # contour_points_list=[
+        #     # First example of the batch
+        #     [np.array(bbox).reshape(-1, 2),],
+        #     # Second example of the batch...
+        # ]
         
-        # Predict mask for the first image
-        mobile_sam_outputs = self._mobile_sam(first_image, contour_points_list)
+        # Predict the masks for the sequence
+        mobile_sam_outputs = self._mobile_sam(rgb_images, contour_points_list)
         
         # Stack the mask(s) from the MobileSAM outputs
         binary_masks = torch.stack([
@@ -179,8 +204,8 @@ class SequenceSegmentationPredictionModel(nn.Module):
         # Compute the probabilistic segmentation mask for the first image
         # (parameters of the implicit segmentation model are set internally)
         first_probabilistic_mask = self._probabilistic_segmentation_model(
-            first_image,
-            binary_masks,
+            rgb_images[0:1],
+            binary_masks[0:1],
         )
         
         # Use the segmentation model with parameters set for the first image to
@@ -199,6 +224,11 @@ class SequenceSegmentationPredictionModel(nn.Module):
         # Compute the segmentation error
         error = self._error_metric(
             preds=probabilistic_masks,
+            target=ground_truth_masks,
+        )
+        
+        optimal_error = self._error_metric(
+            preds=binary_masks[:, 0, ...],
             target=ground_truth_masks,
         )
         
@@ -240,8 +270,7 @@ class SequenceSegmentationPredictionModel(nn.Module):
         # plt.savefig("debug.png")
         # plt.close()
         
-        
-        return error
+        return error, optimal_error
 
 
 if __name__ == "__main__":

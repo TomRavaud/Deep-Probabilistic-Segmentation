@@ -4,6 +4,8 @@ _target_: toolbox.evaluation.sequence_segmentation_prediction_module.SequenceSeg
 probabilistic_segmentation_model:
   _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
   patch_size: 5
+  mlp_hidden_dims: [128, 64, 32]
+  apply_color_transformations: true
   compile: false
   output_logits: false
 

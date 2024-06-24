@@ -26,7 +26,7 @@ scheduler:
       end_factor: 1.0
     - _target_: torch.optim.lr_scheduler.MultiStepLR
       _partial_: true
-      milestones: [150, 250, 350]
+      milestones: [100, 180, 240, 280]
       gamma: 0.5
 
 model:
@@ -53,6 +53,8 @@ model:
       output_logits: true
 
     patch_size: 5
+    mlp_hidden_dims: [128, 64, 32]
+    apply_color_transformations: true
     compile: false
     output_logits: true
 

@@ -1,11 +1,13 @@
 # Standard libraries
 from functools import partial
+from typing import Union, List
 
 # Third-party libraries
 import torch
 import torch.nn as nn
 from torchvision import transforms
 import matplotlib.pyplot as plt
+from omegaconf import ListConfig
 
 # Custom modules
 from toolbox.modules.probabilistic_segmentation_base import (
@@ -21,6 +23,8 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         self,
         net_cls,
         patch_size: int = 5,
+        mlp_hidden_dims: Union[List[int], ListConfig] = [64, 32, 16],
+        apply_color_transformations: bool = False,
         compile: bool = False,
         output_logits: bool = True,
     ) -> None:
@@ -32,6 +36,11 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
                 set, except for the output dimension which depends on the number of
                 parameters of the MLP.
             patch_size (int, optional): Side length of the square patch. Defaults to 5.
+            mlp_hidden_dims (Union[List[int], ListConfig], optional): Number of hidden
+                units per layer in the MLP. Defaults to [64, 32, 16].
+            apply_color_transformations (bool, optional): Whether to apply color
+                transformations to the input images. You should not use this option
+                for inference. Defaults to False.
             compile (bool, optional): Whether to compile the network. Defaults
                 to False.
             output_logits (bool, optional): Whether to output logits or probabilities.
@@ -43,6 +52,7 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
         self._pixel_segmentation_template = PixelSegmentationMLP(
             patch_size=patch_size,
             nb_channels=3,  # RGB channels
+            hidden_dims=list(mlp_hidden_dims),
             output_logits=output_logits,
         )
         
@@ -64,6 +74,24 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             mean=[0.485, 0.456, 0.406],  # Statistics from ImageNet
             std=[0.229, 0.224, 0.225],
         )
+        
+        if apply_color_transformations:
+            # Color transformations to apply to the original image
+            # so that the cnn and mlp do not see the exact same input
+            # (makes the model more robust to minor color changes between frames)
+            self._color_transform = transforms.Compose([
+                transforms.ColorJitter(
+                    brightness=0.4,
+                    contrast=0.4,
+                    saturation=0.4,
+                ),
+                transforms.GaussianBlur(
+                    kernel_size=3,
+                    sigma=(0.1, 2.0)
+                ),
+            ])
+        else:
+            self._color_transform = lambda x: x
 
         self._patch_size = patch_size
     
@@ -184,8 +212,6 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
                 parameters=parameters,
             )
             
-            # TODO: Add some random noise the RGB images to make the segmentation model more robust
-            
             # Set the mask for the i-th image in the batch
             probabilistic_masks[i] = self._masks_by_model(
                 rgb_images[i].unsqueeze(0),
@@ -237,29 +263,31 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             torch.Tensor: Batch of probabilistic segmentation maps (B, H, W). Values
                 are in the range [0, 1] and of type torch.float32.
         """
+        # Apply color transformations to the RGB images
+        rgb_images_transformed = self._color_transform(rgb_images)
+        
         # Convert [0, 255] -> [0.0, 1.0]
         rgb_images = rgb_images.to(dtype=torch.float32)
-        rgb_images /= 255.0 
-        
-        #NOTE:
-        # rgb_images_noisy = rgb_images + torch.randn_like(rgb_images) * 0.005
+        rgb_images /= 255.0
+        rgb_images_transformed = rgb_images_transformed.to(dtype=torch.float32)
+        rgb_images_transformed /= 255.0
         
         # Normalize RGB images
         rgb_images_normalized = self._normalize_transform(rgb_images)
-        #NOTE:
-        # rgb_images_noisy_normalized = self._normalize_transform(rgb_images_noisy)
+        rgb_images_transformed_normalized =\
+            self._normalize_transform(rgb_images_transformed)
         
         # Concatenate masks and RGB images
         input_implicit_segmentation =\
             torch.cat([rgb_images_normalized, binary_masks], dim=1)
 
-        # Predict as much weights and biases sets as the number of images in the batch
+        # Predict as many weights and biases sets as the number of images in the batch
         self._pixel_segmentation_parameters =\
             self._net(input_implicit_segmentation)
         
-        # Compute the probabilistic masks for the input images
+        # Compute the probabilistic masks for the input (transformed) images
         probabilistic_masks = self._apply_pixel_segmentation(
-            rgb_images_normalized,
+            rgb_images_transformed_normalized,
         )
         
         return probabilistic_masks

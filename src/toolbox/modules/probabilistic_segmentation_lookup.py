@@ -21,7 +21,7 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
     
     def __init__(
         self,
-        net: nn.Module,
+        net: nn.Module = None,
         compile: bool = False,
         color_space: str = "rgb",
         nb_bins: Union[ListConfig, tuple] = (10, 10, 10),
@@ -31,7 +31,8 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
         """Constructor of the class.
 
         Args:
-            net (nn.Module): Neural network module for implicit object segmentation.
+            net (nn.Module, optional): Neural network module for implicit object
+                segmentation. Defaults to None.
             compile (bool, optional): Whether to compile the network. Defaults
                 to False.
             color_space (str, optional): Color space of the input images. Defaults to
