@@ -81,9 +81,9 @@ class ProbabilisticSegmentationMLP(ProbabilisticSegmentationBase):
             # (makes the model more robust to minor color changes between frames)
             self._color_transform = transforms.Compose([
                 transforms.ColorJitter(
-                    brightness=0.4,
-                    contrast=0.4,
-                    saturation=0.4,
+                    brightness=0.1,
+                    contrast=0.1,
+                    saturation=0.1,
                 ),
                 transforms.GaussianBlur(
                     kernel_size=3,

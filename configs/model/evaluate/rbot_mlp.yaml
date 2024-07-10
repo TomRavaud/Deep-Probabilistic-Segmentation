@@ -29,6 +29,7 @@ sam_checkpoint: weights/mobile_sam.ckpt
 
 # Probabilistic segmentation model checkpoint
 segmentation_model_checkpoint: logs/train/runs/2024-06-17_03-59-31_mlp_1M_aug_noise_300_epochs/checkpoints/last.ckpt
+# segmentation_model_checkpoint: logs/train/runs/2024-06-13_06-41-21_mlp_1M_aug_scheduling/checkpoints/last.ckpt
 
 # Compile parts of the model for faster training with PyTorch 2.0
 compile: false

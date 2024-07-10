@@ -1,10 +1,12 @@
 # Standard libraries
 from typing import Any, Dict, Tuple
+from functools import partial
 
 # Third-party libraries
 import torch
 from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric
+from omegaconf import DictConfig
 
 # Custom modules
 from toolbox.datasets.segmentation_dataset import BatchSegmentationData
@@ -13,6 +15,9 @@ from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+
+# Change font
+plt.rcParams.update({"font.family": "serif"})
 
 
 class ObjectSegmentationLitModule(LightningModule):
@@ -115,42 +120,57 @@ class ObjectSegmentationLitModule(LightningModule):
     
     def on_before_optimizer_step(self, optimizer) -> None:
         
-        # def plot_grad_flow(named_parameters):
-        #     '''Plots the gradients flowing through different layers in the net during training.
-        #     Can be used for checking for possible gradient vanishing / exploding problems.
+        def plot_grad_flow(named_parameters):
+            '''Plots the gradients flowing through different layers in the net during training.
+            Can be used for checking for possible gradient vanishing / exploding problems.
 
-        #     Usage: Plug this function in Trainer class after loss.backwards() as 
-        #     "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
-        #     ave_grads = []
-        #     max_grads= []
-        #     layers = []
+            Usage: Plug this function in Trainer class after loss.backwards() as 
+            "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+            ave_grads = []
+            max_grads= []
+            layers = []
 
-        #     for n, p in named_parameters:
-        #         if(p.requires_grad) and ("bias" not in n):
-        #             layers.append(n)
-        #             ave_grads.append(p.grad.abs().mean().cpu())
-        #             max_grads.append(p.grad.abs().max().cpu())
+            for n, p in named_parameters:
+                if(p.requires_grad) and ("bias" not in n):
+                    # layers.append(n.split(".")[3:])
+                    layers.append(".".join(n.split(".")[3:-1]))
+                    ave_grads.append(p.grad.abs().mean().cpu())
+                    max_grads.append(p.grad.abs().max().cpu())
 
-        #     # plt.clf()
-        #     plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
-        #     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
-        #     plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
-        #     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
-        #     plt.xlim(left=0, right=len(ave_grads))
-        #     # plt.ylim(bottom = -0.001, top=0.02) # zoom in on the lower gradient regions
-        #     plt.xlabel("Layers")
-        #     plt.ylabel("average gradient")
-        #     plt.title("Gradient flow")
-        #     plt.grid(True)
-        #     plt.legend([Line2D([0], [0], color="c", lw=4),
-        #                 Line2D([0], [0], color="b", lw=4),
-        #                 Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
-        #     plt.savefig("grad_flow.png")
+            plt.figure("fig", figsize=(15, 6))
+            plt.clf()
+            # plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+            plt.bar(np.arange(len(max_grads)), ave_grads, alpha=1, lw=1, color="b")
+            # plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+            plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical", fontsize=8)
+            plt.xlim(left=0, right=len(ave_grads))
+            # plt.ylim(bottom=0, top=1) # zoom in on the lower gradient regions
+            plt.xlabel("Layers")
+            plt.ylabel("Average gradient")
+            # plt.title("Gradient flow")
+            plt.grid(True)
+            # plt.legend(
+            #     [
+            #         # Line2D([0], [0], color="c", lw=4),
+            #         Line2D([0], [0], color="b", lw=4),
+            #         # Line2D([0], [0], color="k", lw=4)
+            #     ],
+            #     [
+            #         # 'max-gradient',
+            #         'mean-gradient',
+            #         # 'zero-gradient'
+            #     ])
+            plt.savefig(
+                f"grad_flow_{self.trainer.global_step}.pgf",
+                bbox_inches='tight',
+                pad_inches=0,
+                transparent=True,
+            )
         
-        # if self.trainer.global_step % 10 == 0:  # 1 batch out of 10
-            
-        #     plot_grad_flow(self._model.named_parameters())
-        pass
+        if self.trainer.global_step % 10 == 0:  # 1 batch out of 10
+             plot_grad_flow(self._model.named_parameters())
+             
+        # pass
             
 
     def on_train_epoch_end(self) -> None:
@@ -238,11 +258,12 @@ class ObjectSegmentationLitModule(LightningModule):
         """
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
         
-        if self.hparams.scheduler is not None:
+        if "scheduler" in self.hparams:
             
             # Manage multiple schedulers
-            if self.hparams.scheduler.main_scheduler is not None\
-                and self.hparams.scheduler.sub_schedulers is not None:
+            if isinstance(self.hparams.scheduler, DictConfig)\
+                and "main_scheduler" in self.hparams.scheduler\
+                and "sub_schedulers" in self.hparams.scheduler:
                     sub_schedulers = [
                         sub_scheduler(optimizer=optimizer)
                         for sub_scheduler in self.hparams.scheduler.sub_schedulers
@@ -250,8 +271,10 @@ class ObjectSegmentationLitModule(LightningModule):
                     scheduler = self.hparams.scheduler.main_scheduler(
                         optimizer=optimizer,
                         schedulers=sub_schedulers)
-            else:
+            elif isinstance(self.hparams.scheduler, partial):
                 scheduler = self.hparams.scheduler(optimizer=optimizer)
+            else:
+                raise ValueError("Invalid scheduler configuration.")
             
             return {
                 "optimizer": optimizer,

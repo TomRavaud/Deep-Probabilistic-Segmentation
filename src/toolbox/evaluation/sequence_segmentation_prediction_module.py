@@ -241,6 +241,10 @@ class SequenceSegmentationPredictionModel(nn.Module):
             optimal_error = None
         
         ##### Debugging #####
+        # # Add delay
+        # import time
+        # time.sleep(1)
+        
         # # Plot the first image of the sequence
         # img = x.rgbs[0, 0]
         # img = img.permute(1, 2, 0).cpu().numpy()
