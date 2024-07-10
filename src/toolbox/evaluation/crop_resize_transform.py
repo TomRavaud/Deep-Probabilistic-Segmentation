@@ -94,6 +94,7 @@ class CropResizeToAspectTransform:
             )[0]
             
         else:
+            rgbs = seq.rgbs
             new_K = seq.K
 
         # Resize to target size

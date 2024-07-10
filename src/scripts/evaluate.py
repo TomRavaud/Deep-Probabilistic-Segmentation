@@ -35,6 +35,9 @@ def evaluate(cfg: DictConfig):
     model: torch.nn.Module = hydra.utils.instantiate(cfg.model)
     model.to(device)
     
+    # Set the model to evaluation mode
+    model.eval()
+    
     # Array to store the results
     results = np.empty((len(dataloader), 4), dtype="<U32")
     
