@@ -51,7 +51,7 @@ dataset_cfg:
   # Minimum area of the modal bounding box of an object to be
   # considered as a valid object
   # min_area: 10000
-  min_area: 2500
+  min_area: 2000
 
   # Whether to choose the first valid object in the scene or a
   # random one

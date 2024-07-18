@@ -83,11 +83,60 @@ class ObjectSegmentationLitModule(LightningModule):
         # Compute the output of the model
         segmentation_masks = self.forward(batch)
         
+        # Get the GT masks
+        masks = batch.masks
+        
+        # Find bounding boxes from the GT masks
+        def find_bboxes(masks):
+            bboxes = []
+            for mask in masks:
+                non_zero_indices = torch.nonzero(mask)
+                y_min, x_min = torch.min(non_zero_indices, dim=0)[0]
+                y_max, x_max = torch.max(non_zero_indices, dim=0)[0]
+                bboxes.append([y_min, x_min, y_max, x_max])
+            return torch.tensor(bboxes)
+
+        bboxes = find_bboxes(masks)
+        
+        # Increase the bounding boxes by a factor of 2
+        def increase_bboxes(bboxes, height, width, scale=2):
+            center_y = (bboxes[:, 0] + bboxes[:, 2]) / 2
+            center_x = (bboxes[:, 1] + bboxes[:, 3]) / 2
+            half_height = (bboxes[:, 2] - bboxes[:, 0]) / 2 * scale
+            half_width = (bboxes[:, 3] - bboxes[:, 1]) / 2 * scale
+
+            y_min = torch.clamp(center_y - half_height, 0, height)
+            x_min = torch.clamp(center_x - half_width, 0, width)
+            y_max = torch.clamp(center_y + half_height, 0, height)
+            x_max = torch.clamp(center_x + half_width, 0, width)
+
+            return torch.stack([y_min, x_min, y_max, x_max], dim=1).long()
+
+        height, width = masks.shape[1], masks.shape[2]
+        increased_bboxes = increase_bboxes(bboxes, height, width)
+        
+        # Extract the bounding boxes from the masks and the predicted masks
+        def extract_bbox_regions(masks, bboxes):
+            regions = []
+            for mask, bbox in zip(masks, bboxes):
+                y_min, x_min, y_max, x_max = bbox
+                regions.append(mask[y_min:y_max, x_min:x_max])
+            return regions
+
+        mask_regions = extract_bbox_regions(masks, increased_bboxes)
+        pred_mask_regions = extract_bbox_regions(segmentation_masks, increased_bboxes)
+        
+        losses = []
+        for pred_region, mask_region in zip(pred_mask_regions, mask_regions):
+            losses.append(self._criterion(pred_region, mask_region))
+
+        loss = torch.mean(torch.stack(losses))
+        
         # Compute the loss between the model's predictions and the GT masks
-        loss = self._criterion(
-            segmentation_masks,
-            batch.masks,
-        )
+        # loss = self._criterion(
+        #     segmentation_masks,
+        #     masks,
+        # )
         
         # NOTE: debugging purposes
         if self.trainer.global_step % 300 == 0:
@@ -120,57 +169,57 @@ class ObjectSegmentationLitModule(LightningModule):
     
     def on_before_optimizer_step(self, optimizer) -> None:
         
-        def plot_grad_flow(named_parameters):
-            '''Plots the gradients flowing through different layers in the net during training.
-            Can be used for checking for possible gradient vanishing / exploding problems.
+        # def plot_grad_flow(named_parameters):
+        #     '''Plots the gradients flowing through different layers in the net during training.
+        #     Can be used for checking for possible gradient vanishing / exploding problems.
 
-            Usage: Plug this function in Trainer class after loss.backwards() as 
-            "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
-            ave_grads = []
-            max_grads= []
-            layers = []
+        #     Usage: Plug this function in Trainer class after loss.backwards() as 
+        #     "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+        #     ave_grads = []
+        #     max_grads= []
+        #     layers = []
 
-            for n, p in named_parameters:
-                if(p.requires_grad) and ("bias" not in n):
-                    # layers.append(n.split(".")[3:])
-                    layers.append(".".join(n.split(".")[3:-1]))
-                    ave_grads.append(p.grad.abs().mean().cpu())
-                    max_grads.append(p.grad.abs().max().cpu())
+        #     for n, p in named_parameters:
+        #         if(p.requires_grad) and ("bias" not in n):
+        #             # layers.append(n.split(".")[3:])
+        #             layers.append(".".join(n.split(".")[3:-1]))
+        #             ave_grads.append(p.grad.abs().mean().cpu())
+        #             max_grads.append(p.grad.abs().max().cpu())
 
-            plt.figure("fig", figsize=(15, 6))
-            plt.clf()
-            # plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
-            plt.bar(np.arange(len(max_grads)), ave_grads, alpha=1, lw=1, color="b")
-            # plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
-            plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical", fontsize=8)
-            plt.xlim(left=0, right=len(ave_grads))
-            # plt.ylim(bottom=0, top=1) # zoom in on the lower gradient regions
-            plt.xlabel("Layers")
-            plt.ylabel("Average gradient")
-            # plt.title("Gradient flow")
-            plt.grid(True)
-            # plt.legend(
-            #     [
-            #         # Line2D([0], [0], color="c", lw=4),
-            #         Line2D([0], [0], color="b", lw=4),
-            #         # Line2D([0], [0], color="k", lw=4)
-            #     ],
-            #     [
-            #         # 'max-gradient',
-            #         'mean-gradient',
-            #         # 'zero-gradient'
-            #     ])
-            plt.savefig(
-                f"grad_flow_{self.trainer.global_step}.pgf",
-                bbox_inches='tight',
-                pad_inches=0,
-                transparent=True,
-            )
+        #     plt.figure("fig", figsize=(15, 6))
+        #     plt.clf()
+        #     # plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+        #     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=1, lw=1, color="b")
+        #     # plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+        #     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical", fontsize=8)
+        #     plt.xlim(left=0, right=len(ave_grads))
+        #     # plt.ylim(bottom=0, top=1) # zoom in on the lower gradient regions
+        #     plt.xlabel("Layers")
+        #     plt.ylabel("Average gradient")
+        #     # plt.title("Gradient flow")
+        #     plt.grid(True)
+        #     # plt.legend(
+        #     #     [
+        #     #         # Line2D([0], [0], color="c", lw=4),
+        #     #         Line2D([0], [0], color="b", lw=4),
+        #     #         # Line2D([0], [0], color="k", lw=4)
+        #     #     ],
+        #     #     [
+        #     #         # 'max-gradient',
+        #     #         'mean-gradient',
+        #     #         # 'zero-gradient'
+        #     #     ])
+        #     plt.savefig(
+        #         f"grad_flow_{self.trainer.global_step}.pgf",
+        #         bbox_inches='tight',
+        #         pad_inches=0,
+        #         transparent=True,
+        #     )
         
-        if self.trainer.global_step % 10 == 0:  # 1 batch out of 10
-             plot_grad_flow(self._model.named_parameters())
+        # if self.trainer.global_step % 10 == 0:  # 1 batch out of 10
+        #      plot_grad_flow(self._model.named_parameters())
              
-        # pass
+        pass
             
 
     def on_train_epoch_end(self) -> None:

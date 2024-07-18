@@ -52,7 +52,7 @@ dataset_cfg:
   # considered as a valid object (should be consistent with the
   # image size)
   # min_area: 10000
-  min_area: 2500
+  min_area: 2000
 
   # Whether to choose the first valid object in the scene or a
   # random one

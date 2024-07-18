@@ -6,28 +6,28 @@ optimizer:
   lr: 0.001
   weight_decay: 0.00001
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.LinearLR
-  _partial_: true
-  start_factor: 1.0
-  end_factor: 0.5
-  total_iters: 20
-
 # scheduler:
-#   main_scheduler:
-#     _target_: torch.optim.lr_scheduler.SequentialLR
-#     _partial_: true 
-#     milestones: [1]
+#   _target_: torch.optim.lr_scheduler.LinearLR
+#   _partial_: true
+#   start_factor: 1.0
+#   end_factor: 0.5
+#   total_iters: 20
+
+scheduler:
+  main_scheduler:
+    _target_: torch.optim.lr_scheduler.SequentialLR
+    _partial_: true 
+    milestones: [1]
   
-#   sub_schedulers:
-#     - _target_: torch.optim.lr_scheduler.LinearLR
-#       _partial_: true
-#       start_factor: 0.0001
-#       end_factor: 1.0
-#     - _target_: torch.optim.lr_scheduler.MultiStepLR
-#       _partial_: true
-#       milestones: [100, 180, 240, 280]
-#       gamma: 0.5
+  sub_schedulers:
+    - _target_: torch.optim.lr_scheduler.LinearLR
+      _partial_: true
+      start_factor: 0.0001
+      end_factor: 1.0
+    - _target_: torch.optim.lr_scheduler.MultiStepLR
+      _partial_: true
+      milestones: [100, 180, 240, 280]
+      gamma: 0.5
 
 model:
   _target_: models.components.object_segmentation_model.ObjectSegmentationModel
@@ -81,6 +81,25 @@ model:
 # criterion:
 #   _target_: torch.nn.BCEWithLogitsLoss
 #   reduction: mean
+
+# criterion:
+#   _target_: models.components.segmentation_losses.DiceLoss
+
+#   # Dice loss parameters
+#   smooth: 1.0  # Smoothing factor
+
+#   with_logits: true  # If 'true', sigmoid activation is applied
+
+
+# criterion:
+#   _target_: models.components.segmentation_losses.FocalLoss
+
+#   # Focal loss parameters
+#   gamma: 2.0  # Focusing parameter
+#   alpha: 0.25  # Balancing parameter (percentage of negative samples)
+
+#   with_logits: true  # If 'true', sigmoid activation is applied
+
 
 criterion:
   _target_: models.components.segmentation_losses.FocalDiceCombinationLoss
