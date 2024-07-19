@@ -5,185 +5,317 @@ import torch.nn.functional as F
 import torchinfo
 
 
-class ConvBlock(nn.Module):
-    
+class ResamplingLayer1d(nn.Module):
+    """
+    Downsamples or upsamples the input tensor by a factor of 2, or does nothing
+    if the number of input and output channels is the same. The resampling
+    is done by using a learnable convolutional layer to avoid information loss.
+    """
     def __init__(
         self,
-        in_channels,
-        out_channels,
-        nb_layers,
-        output_activation=F.relu,
-        down_scaling=False,
-        use_residual=True,
+        in_channels: int,
+        out_channels: int,
     ) -> None:
-        
-        super(ConvBlock, self).__init__()
+        """Constructor.
 
-        conv_layers = []
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+
+        Raises:
+            ValueError: If the number of input and/or output channels is invalid.
+        """
+        super(ResamplingLayer1d, self).__init__()
         
-        # Create all the convolutional layers for the block
-        for i in range(nb_layers):
-            
-            # The first layer of the block may be different if downscaling is required
-            # (downscaling is done by using a stride of 2 in the convolutional layer,
-            # not by using a pooling layer which induces a loss of information)
-            if i == 0:
-                conv_layers.append(
+        # Define the resampling layer
+        self._resampling_layer = lambda x: x
+        if in_channels != out_channels:
+            # Downsampling
+            if out_channels == in_channels * 2:
+                # We can use a max pooling layer instead of a convolutional layer
+                # to improve the computational efficiency (but it leads to a loss
+                # of expressiveness)
+                self._resampling_layer = nn.Sequential(
                     nn.Conv1d(
                         in_channels=in_channels,
                         out_channels=out_channels,
-                        kernel_size=4 if down_scaling else 3,
-                        stride=2 if down_scaling else 1,
-                        padding=1,
-                    )
+                        kernel_size=2,
+                        stride=2,
+                        padding=0,
+                    ),
+                    nn.BatchNorm1d(out_channels),
+                    nn.ReLU(),
                 )
-            # The other layers do not change the input dimensions
+            # Upsampling
+            elif out_channels == in_channels / 2:
+                # We can use an upsampling layer instead of a convolutional layer
+                # to improve the computational efficiency (but it leads to a loss
+                # of expressiveness)
+                self._resampling_layer = nn.Sequential(
+                    nn.ConvTranspose1d(
+                        in_channels=in_channels,
+                        out_channels=out_channels,
+                        kernel_size=2,
+                        stride=2,
+                        padding=0,
+                    ),
+                    nn.BatchNorm1d(out_channels),
+                    nn.ReLU(),
+                )
             else:
-                conv_layers.append(
+                raise ValueError(
+                    f"Invalid number of channels: {in_channels} -> {out_channels}"
+                )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        return self._resampling_layer(x)
+
+
+class ConvBlock1d(nn.Module):
+    """
+    A series of convolutional layers with batch normalization and ReLU activation.
+    If the number of input and output channels is different, the first layer of
+    the block is used to adjust the number of channels, and the other layers
+    keep the number of channels the same. A residual connection may optionally
+    be added if the number of layers (excluding the first layer if it is used to adjust
+    the number of channels) is greater than 2.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        nb_layers: int,
+        use_residual=True,
+    ) -> None:
+        """Constructor.
+
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+            nb_layers (int): Number of convolutional layers in the block.
+            use_residual (bool, optional): Whether to use a residual connection
+                within the block. Only applies if the number of layers is greater
+                is greater than 3, or if the number of layers is greater than 2 and
+                the number of input and output channels is the same. Defaults to True.
+        """
+        super(ConvBlock1d, self).__init__()
+        
+        # Create a first layer to adjust the number of channels if needed
+        self._first_conv = None
+        if in_channels != out_channels:
+            self._first_conv = nn.Sequential(
+                nn.Conv1d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding="same",
+                ),
+                nn.BatchNorm1d(out_channels),
+                nn.ReLU(),
+            )
+            nb_layers -= 1
+        
+        # Create the other convolutional layers
+        # (do not change the number of channels)
+        conv_layers = []
+        for i in range(nb_layers):
+            conv_layers.append(
+                nn.Sequential(
                     nn.Conv1d(
                         in_channels=out_channels,
                         out_channels=out_channels,
                         kernel_size=3,
                         stride=1,
                         padding="same",
-                    )
+                    ),
+                    nn.BatchNorm1d(out_channels),
+                    nn.ReLU() if i < nb_layers - 1 else nn.Identity(),
                 )
-        self._conv_layers = nn.ModuleList(conv_layers)
-        self._output_activation = output_activation
-        # self._output_activation = nn.ReLU()
-        self._use_residual = use_residual and nb_layers > 2
-
-    def forward(self, x):
+            )
+        self._conv_layers = nn.Sequential(*conv_layers)
         
-        # Apply the convolutional layers
-        for i in range(len(self._conv_layers)):
-            
-            # We store the tensor obtained after the first convolutional layer
-            # to perform the residual connection
-            if i == 1 and self._use_residual:
-                x_at_start = x.clone()
-            
-            # Apply the convolutional layer
-            x = self._conv_layers[i](x)
-            
-            # Apply the output activation function
-            if i == len(self._conv_layers) - 1:
-                x = self._output_activation(x)
-            else:
-                x = F.relu(x)
+        # Eventually use a residual connection within the block
+        self._use_residual = use_residual and nb_layers > 2
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
 
-        # Add the residual connection to allow the gradient to flow through the network
-        # more easily
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        if self._first_conv is not None:
+            x = self._first_conv(x)
+        
+        # Store the initial tensor to perform the residual connection if needed
+        if self._use_residual:
+            x_at_start = x.clone()
+            
+        # Apply the convolutional layers
+        x = self._conv_layers(x)
+        
+        # Perform the residual connection if needed
         if self._use_residual:
             x += x_at_start
         
+        x = F.relu(x)
+        
         return x
 
-# class FiLM(nn.Module):
-#     def __init__(self, in_channels, context_dim):
-#         super(FiLM, self).__init__()
-#         self.gamma_fc = nn.Linear(context_dim, in_channels)
-#         self.beta_fc = nn.Linear(context_dim, in_channels)
 
-#     def forward(self, x, context):
-#         gamma = self.gamma_fc(context).unsqueeze(2).unsqueeze(3).expand_as(x)
-#         beta = self.beta_fc(context).unsqueeze(2).unsqueeze(3).expand_as(x)
-#         return gamma * x + beta
+class UNetEncoder1d(nn.Module):
+    """
+    The encoder of the U-Net 1D architecture. It consists of a series of
+    convolutional blocks followed by downsampling layers.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        channels_list: list,
+        nb_layers_per_block: int = 1,
+    ) -> None:
+        """Constructor.
 
-            
-class UNet1dEncoder(nn.Module):
-    
-    def __init__(self, channels_list, nb_layers_per_block=1):
+        Args:
+            in_channels (int): Number of input channels.
+            channels_list (list): List of the number of channels at each scale.
+            nb_layers_per_block (int, optional): Number of convolutional layers
+                in each block. Defaults to 1.
+        """
+        super(UNetEncoder1d, self).__init__()
         
-        super(UNet1dEncoder, self).__init__()
-        
-        conv_blocks = []
-        
-        # Create all the convolutional blocks for the encoder
-        for i in range(len(channels_list) - 1):
-            
-            in_channels, out_channels = channels_list[i:i+2]
-            
-            conv_blocks.append(
-                ConvBlock(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
+        # Create all the convolutional blocks and downsampling layers
+        self._layers = nn.ModuleList()
+        for i in range(0, len(channels_list) - 1):
+            # First block has a different number of input channels and
+            # other blocks the same number of input and output channels
+            in_channels_i = in_channels if i == 0 else channels_list[i]
+            # Convolutional block
+            self._layers.append(
+                ConvBlock1d(
+                    in_channels=in_channels_i,
+                    out_channels=channels_list[i],
                     nb_layers=nb_layers_per_block,
-                    down_scaling=True
                 )
             )
-        self._conv_blocks = nn.ModuleList(conv_blocks)
-
-    def forward(self, x):
+            # Downsampling layer
+            self._layers.append(
+                ResamplingLayer1d(
+                    in_channels=channels_list[i],
+                    out_channels=channels_list[i+1],
+                )
+            )
         
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            tuple[torch.Tensor, list[torch.Tensor]]: Output tensor and list of
+                intermediate tensors to be sent to the decoder.
+        """
+        # List to store the intermediate tensors to communicate to the decoder
         intermediate_states = []
         
-        # Apply the convolutional blocks
-        for i, conv in enumerate(self._conv_blocks):
-            
+        for i in range(0, len(self._layers), 2):
+        
             # Apply the convolutional block
-            x = conv(x)
+            x = self._layers[i](x)
             
             # Store the intermediate tensors to concatenate them in the decoder
-            if i < len(self._conv_blocks) - 1:
-                intermediate_states.append(x.clone())
-        
+            intermediate_states.append(x.clone())
+            
+            # Apply the downsampling layer
+            x = self._layers[i+1](x)
+            
         return x, intermediate_states
     
 
-class UNet1dDecoder(nn.Module):
-    
-    def __init__(self, channels_list, nb_layers_per_block):
-        
-        super(UNet1dDecoder, self).__init__()
-        
-        conv_blocks = []
-        
-        nb_layers = len(channels_list) - 1
-        
-        # Create all the convolutional blocks for the decoder
-        for i in range(nb_layers):
-            
-            in_channels = channels_list[i] * (2 if i > 0 else 1)
-            out_channels = channels_list[i + 1]
-            
-            # The last layer reduces the number of channels
-            if i == nb_layers - 1:
-                conv_blocks.append(
-                    ConvBlock(
-                        in_channels=in_channels,
-                        out_channels=out_channels,
-                        nb_layers=1,
-                        output_activation=lambda x: x,
-                    )
-                )
-            else:
-                conv_blocks.append(
-                    ConvBlock(
-                        in_channels=in_channels,
-                        out_channels=out_channels,
-                        nb_layers=nb_layers_per_block,
-                        output_activation=F.relu,
-                    )
-                )
-        self._conv_blocks = nn.ModuleList(conv_blocks)
+class UNetDecoder1d(nn.Module):
+    """
+    The decoder of the U-Net 1D architecture. It consists of a series of
+    upsampling layers followed by convolutional blocks.
+    """
+    def __init__(
+        self,
+        channels_list: list,
+        nb_layers_per_block: int = 1,
+    ) -> None:
+        """Constructor.
 
-    def forward(self, x, skip_connections):
+        Args:
+            channels_list (list): List of the number of channels at each scale.
+            nb_layers_per_block (int, optional): Number of convolutional layers
+                in each block. Defaults to 1.
+        """
+        super(UNetDecoder1d, self).__init__()
         
-        # Apply the convolutional blocks
-        for i, conv in enumerate(self._conv_blocks):
-            
-            # Skip connection concatenation
-            if i > 0:
-                x = torch.cat([x, skip_connections[-i]], axis=1)
-            
-            # Upsample and apply the convolutional block
-            x = F.interpolate(x, scale_factor=2, mode="nearest")
-            x = conv(x)
+        # Create all the convolutional blocks and upsampling layers
+        self._layers = nn.ModuleList()
+        for i in range(0, len(channels_list) - 1):
+            # Upsampling layer
+            self._layers.append(
+                ResamplingLayer1d(
+                    in_channels=channels_list[i],
+                    out_channels=channels_list[i+1],
+                )
+            )
+            # Convolutional block
+            # (different number of input channels and output channels)
+            self._layers.append(
+                ConvBlock1d(
+                    in_channels=channels_list[i],
+                    out_channels=channels_list[i+1],
+                    nb_layers=nb_layers_per_block,
+                )
+            )
         
+    def forward(
+        self,
+        x: torch.Tensor,
+        intermediate_states: list[torch.Tensor],
+    ) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            intermediate_states (list[torch.Tensor]): List of intermediate tensors
+                from the encoder.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        for i in range(0, len(self._layers), 2):
+            
+            # Apply the upsampling layer
+            x = self._layers[i](x)
+            
+            # Concatenate the intermediate tensor from the encoder
+            x = torch.cat([x, intermediate_states[-(i//2+1)]], axis=1)
+        
+            # Apply the convolutional block
+            x = self._layers[i+1](x)
+            
         return x
 
-class FiLMedUNet1d(nn.Module):
+
+class UNet1d(nn.Module):
+    """
+    The U-Net 1D architecture. It consists of an encoder, a bridge and a decoder.
+    """
     def __init__(
         self,
         in_channels: int = 3,
@@ -193,31 +325,78 @@ class FiLMedUNet1d(nn.Module):
         nb_layers_bridge: int = 3,
         nb_layers_per_block_decoder: int = 3,
         output_logits: bool = True,
-    ):
-        super(FiLMedUNet1d, self).__init__()
+    ) -> None:
+        """Constructor.
+
+        Args:
+            in_channels (int, optional): Number of input channels. Defaults to 3.
+            out_channels (int, optional): Number of output channels. Defaults to 1.
+            channels_list (list, optional): List of the number of channels at each
+                scale. Defaults to [16, 32, 64].
+            nb_layers_per_block_encoder (int, optional): Number of convolutional
+                layers in each block of the encoder. Defaults to 3.
+            nb_layers_bridge (int, optional): Number of convolutional layers in the
+                bridge between the encoder and the decoder. Defaults to 3.
+            nb_layers_per_block_decoder (int, optional): Number of convolutional
+                layers in each block of the decoder. Defaults to 3.
+            output_logits (bool, optional): Whether to output logits or probabilities
+                (sigmoid activation). Defaults to True.
+        """
+        super(UNet1d, self).__init__()
+        
+        # Used to check the width of the input tensor
+        self._divisor = 2**(len(channels_list)-1)
         
         # Create the encoder, bridge and decoder
-        down_channels = [in_channels] + channels_list
-        self._encoder = UNet1dEncoder(
-            channels_list=down_channels,
+        # down_channels = [in_channels] + channels_list
+        self._encoder = UNetEncoder1d(
+            in_channels=in_channels,
+            channels_list=channels_list,
             nb_layers_per_block=nb_layers_per_block_encoder,
         )
-        self._bridge  = ConvBlock(
+        self._bridge  = ConvBlock1d(
             in_channels=channels_list[-1],
             out_channels=channels_list[-1],
             nb_layers=nb_layers_bridge,
         )
-        up_channels = channels_list[::-1] + [out_channels]
-        self._decoder = UNet1dDecoder(
-            channels_list=up_channels,
+        self._decoder = UNetDecoder1d(
+            channels_list=channels_list[::-1],
             nb_layers_per_block=nb_layers_per_block_decoder,
+        )
+        
+        # Last layer to reduce the number of channels to the number of output channels
+        self._output_layer = nn.Conv1d(
+            in_channels=channels_list[0],
+            out_channels=out_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0,
         )
         
         # The sigmoid activation is to be applied in inference mode ; in training mode,
         # it is usually included in the loss function to ensure numerical stability
         self._output_activation = nn.Identity() if output_logits else nn.Sigmoid()
         
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Raises:
+            ValueError: If the width of the input tensor is not divisible by the scale
+            factor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        # Check the width of the input tensor
+        if x.size(-1) % self._divisor != 0:
+            raise ValueError(
+                f"Invalid width of the input tensor: {x.size(-1)} "
+                f"(should be a multiple of {self._divisor})"
+            )
+        
         # Encode the input and get the intermediate states
         x, intermediate_states = self._encoder(x)
         
@@ -228,6 +407,9 @@ class FiLMedUNet1d(nn.Module):
         # to perform the skip connections
         x = self._decoder(x, intermediate_states)
         
+        # Reduce the number of channels to the number of output channels
+        # and apply the activation function
+        x = self._output_layer(x)
         x = self._output_activation(x)
         
         return x
@@ -238,7 +420,7 @@ if __name__ == "__main__":
     config = {
         "in_channels": 3,
         "out_channels": 1,
-        "channels_list": [16, 32, 64],  # Number of channels after each block
+        "channels_list": [16, 32, 64, 128],  # Number of channels after each block
         "nb_layers_per_block_encoder": 3,
         "nb_layers_bridge": 3,
         "nb_layers_per_block_decoder": 3,
@@ -247,6 +429,15 @@ if __name__ == "__main__":
     
     # Display the model architecture
     torchinfo.summary(
-        FiLMedUNet1d(**config),
+        UNet1d(**config),
         input_size=(1, 3, 120),
     )
+    
+    # model = UNet1d(**config)
+    # x = torch.randn(1, 3, 120)
+    # y = model(x)
+    
+    # Export the model to ONNX
+    # model = UNet1d(**config)
+    # x = torch.randn(1, 3, 120)
+    # torch.onnx.export(model, x, "model.onnx", verbose=False, training=torch.onnx.TrainingMode.TRAINING)

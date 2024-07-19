@@ -16,5 +16,6 @@ __pycache__/
 
 debug.png
 result_segmentation.png
+model.onnx
 
-/tracking_dataset_processing/
+/src/toolbox/tracking_dataset_processing/
