@@ -16,3 +16,5 @@ __pycache__/
 
 debug.png
 result_segmentation.png
+
+/tracking_dataset_processing/

@@ -132,7 +132,7 @@ if __name__ == "__main__":
     
     torchinfo.summary(
         SimpleResNet(
-            version=56,
+            version=34,
             output_dim=(15,),
             nb_input_channels=None,
         ),
