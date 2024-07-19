@@ -348,7 +348,6 @@ class UNet1d(nn.Module):
         self._divisor = 2**(len(channels_list)-1)
         
         # Create the encoder, bridge and decoder
-        # down_channels = [in_channels] + channels_list
         self._encoder = UNetEncoder1d(
             in_channels=in_channels,
             channels_list=channels_list,
@@ -413,7 +412,51 @@ class UNet1d(nn.Module):
         x = self._output_activation(x)
         
         return x
-    
+
+
+class FiLM(nn.Module):
+    """
+    Feature-wise Linear Modulation (FiLM) layer to conditionally transform
+    an input tensor based on a context vector.
+    """
+    def __init__(self, in_channels: int, context_dim: int) -> None:
+        """Constructor.
+
+        Args:
+            in_channels (int): Number of input channels.
+            context_dim (int): Dimension of the context vector.
+        """
+        super(FiLM, self).__init__()
+        
+        # Fully connected layers to compute scale and shift factors
+        # from a context vector
+        self._gamma_fc = nn.Linear(context_dim, in_channels)
+        self._beta_fc = nn.Linear(context_dim, in_channels)
+        
+        # Initialize the parameters so that the FiLM layer is initially
+        # the identity function
+        self._gamma_fc.weight.data.fill_(0)
+        self._gamma_fc.bias.data.fill_(1)
+        self._beta_fc.weight.data.fill_(0)
+        self._beta_fc.bias.data.fill_(0)
+
+    def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            context (torch.Tensor): Context vector.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        # Compute the scale and shift factors
+        gamma = self._gamma_fc(context).unsqueeze(2).expand_as(x)
+        beta = self._beta_fc(context).unsqueeze(2).expand_as(x)
+        
+        # Transform the input tensor
+        return gamma * x + beta
+
 
 if __name__ == "__main__":
     
@@ -433,6 +476,10 @@ if __name__ == "__main__":
         input_size=(1, 3, 120),
     )
     
+    # x = torch.randn(1, 1, 12)
+    # film = FiLM(1, 10)
+    # y = film(x, torch.randn(1, 10))
+    
     # model = UNet1d(**config)
     # x = torch.randn(1, 3, 120)
     # y = model(x)
@@ -440,4 +487,10 @@ if __name__ == "__main__":
     # Export the model to ONNX
     # model = UNet1d(**config)
     # x = torch.randn(1, 3, 120)
-    # torch.onnx.export(model, x, "model.onnx", verbose=False, training=torch.onnx.TrainingMode.TRAINING)
+    # torch.onnx.export(
+    #     model,
+    #     x,
+    #     "model.onnx",
+    #     verbose=False,
+    #     training=torch.onnx.TrainingMode.TRAINING,
+    # )
