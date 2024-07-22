@@ -1,3 +1,6 @@
+# Standard libraries
+from typing import Optional
+
 # Third-party libraries
 import torch
 import torch.nn as nn
@@ -93,7 +96,8 @@ class ConvBlock1d(nn.Module):
         in_channels: int,
         out_channels: int,
         nb_layers: int,
-        use_residual=True,
+        use_residual: bool = True,
+        film_dim: Optional[int] = None,
     ) -> None:
         """Constructor.
 
@@ -105,6 +109,8 @@ class ConvBlock1d(nn.Module):
                 within the block. Only applies if the number of layers is greater
                 is greater than 3, or if the number of layers is greater than 2 and
                 the number of input and output channels is the same. Defaults to True.
+            film (bool, optional): Whether to use Feature-wise Linear Modulation
+                (FiLM). Defaults to False.
         """
         super(ConvBlock1d, self).__init__()
         
@@ -120,6 +126,8 @@ class ConvBlock1d(nn.Module):
                     padding="same",
                 ),
                 nn.BatchNorm1d(out_channels),
+                FiLM(out_channels, film_dim) if nb_layers == 1 and film_dim is not None\
+                    else nn.Identity(),
                 nn.ReLU(),
             )
             nb_layers -= 1
@@ -138,6 +146,9 @@ class ConvBlock1d(nn.Module):
                         padding="same",
                     ),
                     nn.BatchNorm1d(out_channels),
+                    # FiLM layer added only to the last layer
+                    FiLM(out_channels, film_dim) if i == nb_layers - 1 and film_dim\
+                        is not None else nn.Identity(),
                     nn.ReLU() if i < nb_layers - 1 else nn.Identity(),
                 )
             )
@@ -146,24 +157,46 @@ class ConvBlock1d(nn.Module):
         # Eventually use a residual connection within the block
         self._use_residual = use_residual and nb_layers > 2
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Eventually use FiLM to condition the convolutional block
+        self._use_film = isinstance(film_dim, int)
+        
+    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
         """Forward pass.
 
         Args:
             x (torch.Tensor): Input tensor.
+            context (torch.Tensor, optional): Context vector for FiLM. Defaults to
+                None.
 
         Returns:
             torch.Tensor: Output tensor.
+        
+        Raises:
+            ValueError: If FiLM is used but no context vector is provided.
         """
+        # First layer to adjust the number of channels if needed
         if self._first_conv is not None:
-            x = self._first_conv(x)
+            if len(self._conv_layers) == 0 and self._use_film and context is not None:
+                for mod in self._first_conv:
+                    x = mod(x, context) if isinstance(mod, FiLM) else mod(x)
+            elif len(self._conv_layers) > 0 or not self._use_film:
+                x = self._first_conv(x)
+            else:
+                raise ValueError("FiLM requires a context vector")
         
         # Store the initial tensor to perform the residual connection if needed
         if self._use_residual:
             x_at_start = x.clone()
             
         # Apply the convolutional layers
-        x = self._conv_layers(x)
+        if self._use_film and context is not None:
+            for conv_layer in self._conv_layers:
+                for mod in conv_layer:
+                    x = mod(x, context) if isinstance(mod, FiLM) else mod(x)
+        elif not self._use_film:
+            x = self._conv_layers(x)
+        else:
+            raise ValueError("FiLM requires a context vector")
         
         # Perform the residual connection if needed
         if self._use_residual:
@@ -184,6 +217,7 @@ class UNetEncoder1d(nn.Module):
         in_channels: int,
         channels_list: list,
         nb_layers_per_block: int = 1,
+        film_dim: Optional[int] = None,
     ) -> None:
         """Constructor.
 
@@ -192,6 +226,8 @@ class UNetEncoder1d(nn.Module):
             channels_list (list): List of the number of channels at each scale.
             nb_layers_per_block (int, optional): Number of convolutional layers
                 in each block. Defaults to 1.
+            film_dim (int, optional): Dimension of the context vector for FiLM.
+                Defaults to None.
         """
         super(UNetEncoder1d, self).__init__()
         
@@ -207,6 +243,7 @@ class UNetEncoder1d(nn.Module):
                     in_channels=in_channels_i,
                     out_channels=channels_list[i],
                     nb_layers=nb_layers_per_block,
+                    film_dim=film_dim,
                 )
             )
             # Downsampling layer
@@ -217,11 +254,17 @@ class UNetEncoder1d(nn.Module):
                 )
             )
         
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        context: torch.Tensor = None,
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """Forward pass.
 
         Args:
             x (torch.Tensor): Input tensor.
+            context (torch.Tensor, optional): Context vector for FiLM. Defaults to
+                None.
 
         Returns:
             tuple[torch.Tensor, list[torch.Tensor]]: Output tensor and list of
@@ -233,7 +276,7 @@ class UNetEncoder1d(nn.Module):
         for i in range(0, len(self._layers), 2):
         
             # Apply the convolutional block
-            x = self._layers[i](x)
+            x = self._layers[i](x, context)
             
             # Store the intermediate tensors to concatenate them in the decoder
             intermediate_states.append(x.clone())
@@ -251,12 +294,14 @@ class UNetDecoder1d(nn.Module):
     """
     def __init__(
         self,
+        out_channels: int,
         channels_list: list,
         nb_layers_per_block: int = 1,
     ) -> None:
         """Constructor.
 
         Args:
+            out_channels (int): Number of output channels.
             channels_list (list): List of the number of channels at each scale.
             nb_layers_per_block (int, optional): Number of convolutional layers
                 in each block. Defaults to 1.
@@ -283,6 +328,15 @@ class UNetDecoder1d(nn.Module):
                 )
             )
         
+        # Last layer to reduce the number of channels to the number of output channels
+        self._output_layer = nn.Conv1d(
+            in_channels=channels_list[-1],
+            out_channels=out_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+        )
+        
     def forward(
         self,
         x: torch.Tensor,
@@ -308,6 +362,8 @@ class UNetDecoder1d(nn.Module):
         
             # Apply the convolutional block
             x = self._layers[i+1](x)
+        
+        x = self._output_layer(x)
             
         return x
 
@@ -324,6 +380,7 @@ class UNet1d(nn.Module):
         nb_layers_per_block_encoder: int = 3,
         nb_layers_bridge: int = 3,
         nb_layers_per_block_decoder: int = 3,
+        film_dim: Optional[int] = None,
         output_logits: bool = True,
     ) -> None:
         """Constructor.
@@ -339,6 +396,8 @@ class UNet1d(nn.Module):
                 bridge between the encoder and the decoder. Defaults to 3.
             nb_layers_per_block_decoder (int, optional): Number of convolutional
                 layers in each block of the decoder. Defaults to 3.
+            film_dim (int, optional): Dimension of the context vector for FiLM.
+                Defaults to None.
             output_logits (bool, optional): Whether to output logits or probabilities
                 (sigmoid activation). Defaults to True.
         """
@@ -352,35 +411,31 @@ class UNet1d(nn.Module):
             in_channels=in_channels,
             channels_list=channels_list,
             nb_layers_per_block=nb_layers_per_block_encoder,
+            film_dim=film_dim,
         )
         self._bridge  = ConvBlock1d(
             in_channels=channels_list[-1],
             out_channels=channels_list[-1],
             nb_layers=nb_layers_bridge,
+            film_dim=film_dim,
         )
         self._decoder = UNetDecoder1d(
+            out_channels=out_channels,
             channels_list=channels_list[::-1],
             nb_layers_per_block=nb_layers_per_block_decoder,
-        )
-        
-        # Last layer to reduce the number of channels to the number of output channels
-        self._output_layer = nn.Conv1d(
-            in_channels=channels_list[0],
-            out_channels=out_channels,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-        )
+        ) 
         
         # The sigmoid activation is to be applied in inference mode ; in training mode,
         # it is usually included in the loss function to ensure numerical stability
         self._output_activation = nn.Identity() if output_logits else nn.Sigmoid()
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, context: torch.Tensor = None) -> torch.Tensor:
         """Forward pass.
 
         Args:
             x (torch.Tensor): Input tensor.
+            context (torch.Tensor, optional): Context vector for FiLM. Defaults to
+                None.
 
         Raises:
             ValueError: If the width of the input tensor is not divisible by the scale
@@ -397,18 +452,16 @@ class UNet1d(nn.Module):
             )
         
         # Encode the input and get the intermediate states
-        x, intermediate_states = self._encoder(x)
+        x, intermediate_states = self._encoder(x, context)
         
         # Pass the encoded tensor through the bridge
-        x = self._bridge(x)
+        x = self._bridge(x, context)
         
         # Decode the tensor using the intermediate states from the encoder
         # to perform the skip connections
         x = self._decoder(x, intermediate_states)
         
-        # Reduce the number of channels to the number of output channels
-        # and apply the activation function
-        x = self._output_layer(x)
+        # Apply the activation function
         x = self._output_activation(x)
         
         return x
@@ -467,13 +520,14 @@ if __name__ == "__main__":
         "nb_layers_per_block_encoder": 3,
         "nb_layers_bridge": 3,
         "nb_layers_per_block_decoder": 3,
+        "film_dim": 3,  # Dimension of the context vector for FiLM
         "output_logits": True,  # Whether to output logits or probabilities
     }
     
     # Display the model architecture
     torchinfo.summary(
         UNet1d(**config),
-        input_size=(1, 3, 120),
+        input_size=[(1, 3, 120), (1, 3)],
     )
     
     # x = torch.randn(1, 1, 12)
@@ -482,7 +536,7 @@ if __name__ == "__main__":
     
     # model = UNet1d(**config)
     # x = torch.randn(1, 3, 120)
-    # y = model(x)
+    # y = model(x, torch.randn(1, 10))
     
     # Export the model to ONNX
     # model = UNet1d(**config)
