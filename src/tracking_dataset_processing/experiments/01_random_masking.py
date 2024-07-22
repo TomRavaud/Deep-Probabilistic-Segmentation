@@ -7,28 +7,31 @@ import numpy as np
 from tqdm import tqdm
 
 
-# Parameters
-save_figures = True
+#------------#
+# Parameters #
+#------------#
+SAVE_FIGURES = True
 
-data_path = Path("data/webdatasets")
-dataset_name = "gso_1K"
-chunk_id = "00000000"
-min_line_size = 60
-min_line_size_half = 8
+DATA_PATH = Path("data/webdatasets")
+DATASET_NAME = "gso_1M"
+CHUNK_ID = "00000000"
+MIN_LINE_SIZE = 60
+MIN_LINE_SIZE_HALF = 8
+#------------#
 
 
-output_path = data_path / f"{dataset_name}_clines" / chunk_id
+output_path = DATA_PATH / f"{DATASET_NAME}_clines" / CHUNK_ID
 sample_names = [o.name.split(".")[0] for o in output_path.glob("*.clines.rgb.npy")]
 
 
-for sample_name in tqdm(sample_names):
+for sample_name in tqdm(sample_names[:3]):
     
     rgb = np.load(output_path / f"{sample_name}.clines.rgb.npy")
     seg = np.load(output_path / f"{sample_name}.clines.seg.npy")
     
     mask = np.isnan(seg)
     
-    clip_width = np.random.randint(0, min_line_size - min_line_size_half)
+    clip_width = np.random.randint(0, MIN_LINE_SIZE - MIN_LINE_SIZE_HALF)
     
     if clip_width == 0:
         m = np.bitwise_and(
@@ -69,7 +72,7 @@ for sample_name in tqdm(sample_names):
     masked_seg[mask] = 127
     masked_seg = masked_seg.astype(np.uint8)
 
-    if save_figures:
+    if SAVE_FIGURES:
         
         fig: plt.Figure
         fig, axes = plt.subplots(1, 2, squeeze=False, sharex=True, sharey=True)

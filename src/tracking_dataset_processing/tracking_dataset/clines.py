@@ -39,9 +39,27 @@ def extract_contour_points_and_normals(mask, num_points_on_contour=200):
     # Get the largest contour
     contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     contour = contours[np.argmax([cv2.contourArea(c) for c in contours])][:, 0, :]
+    
+    # Remove consecutive duplicates
+    valid_idx = np.where(np.abs(np.diff(contour[:, 0])) +\
+        np.abs(np.diff(contour[:, 1])) > 0)[0]
+    contour = np.r_[
+        contour[valid_idx],
+        contour[-1][None, :],
+        contour[0][None, :]
+    ]
 
     # Interpolate the contour to compute normals
-    tck, u = interpolate.splprep(contour.T, per=True)
+    try:
+        tck, u = interpolate.splprep(contour.T, per=True)
+    except ValueError:
+        print(contour)
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        plt.imshow(mask)
+        fig.savefig("mask.png")
+        exit()
+    
     tii = np.linspace(
         0, contour.shape[0], num_points_on_contour, endpoint=False, dtype=int
     )
