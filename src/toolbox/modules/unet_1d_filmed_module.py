@@ -82,6 +82,53 @@ class ResamplingLayer1d(nn.Module):
         return self._resampling_layer(x)
 
 
+class FiLM(nn.Module):
+    """
+    Feature-wise Linear Modulation (FiLM) layer to conditionally transform
+    an input tensor based on a context vector.
+    """
+    def __init__(self, in_channels: int, context_dim: int) -> None:
+        """Constructor.
+
+        Args:
+            in_channels (int): Number of input channels.
+            context_dim (int): Dimension of the context vector.
+        """
+        super(FiLM, self).__init__()
+        
+        # Fully connected layers to compute scale and shift factors
+        # from a context vector
+        self._gamma_fc = nn.Linear(context_dim, in_channels)
+        self._beta_fc = nn.Linear(context_dim, in_channels)
+        
+        # Initialize the parameters so that the FiLM layer is initially
+        # the identity function
+        self._gamma_fc.weight.data.fill_(0)
+        self._gamma_fc.bias.data.fill_(1)
+        self._beta_fc.weight.data.fill_(0)
+        self._beta_fc.bias.data.fill_(0)
+        
+    def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor. Shape [B, C, L]. B is the number of lines,
+                C the number of channels and L the length of the line.
+            context (torch.Tensor): Context vector. Shape [1, D]. The same context
+                vector is used for all the lines. D is the dimension of the context
+                space.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        # Compute the scale and shift factors
+        gamma = self._gamma_fc(context).unsqueeze(2)  # [1, C, 1]
+        beta = self._beta_fc(context).unsqueeze(2)  # [1, C, 1]
+        
+        # Transform the input tensor (broadcasting)
+        return gamma * x + beta  # [B, C, L]
+
+
 class ConvBlock1d(nn.Module):
     """
     A series of convolutional layers with batch normalization and ReLU activation.
@@ -467,50 +514,6 @@ class UNet1d(nn.Module):
         return x
 
 
-class FiLM(nn.Module):
-    """
-    Feature-wise Linear Modulation (FiLM) layer to conditionally transform
-    an input tensor based on a context vector.
-    """
-    def __init__(self, in_channels: int, context_dim: int) -> None:
-        """Constructor.
-
-        Args:
-            in_channels (int): Number of input channels.
-            context_dim (int): Dimension of the context vector.
-        """
-        super(FiLM, self).__init__()
-        
-        # Fully connected layers to compute scale and shift factors
-        # from a context vector
-        self._gamma_fc = nn.Linear(context_dim, in_channels)
-        self._beta_fc = nn.Linear(context_dim, in_channels)
-        
-        # Initialize the parameters so that the FiLM layer is initially
-        # the identity function
-        self._gamma_fc.weight.data.fill_(0)
-        self._gamma_fc.bias.data.fill_(1)
-        self._beta_fc.weight.data.fill_(0)
-        self._beta_fc.bias.data.fill_(0)
-
-    def forward(self, x: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        """Forward pass.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-            context (torch.Tensor): Context vector.
-
-        Returns:
-            torch.Tensor: Output tensor.
-        """
-        # Compute the scale and shift factors
-        gamma = self._gamma_fc(context).unsqueeze(2).expand_as(x)
-        beta = self._beta_fc(context).unsqueeze(2).expand_as(x)
-        
-        # Transform the input tensor
-        return gamma * x + beta
-
-
 if __name__ == "__main__":
     
     config = {
@@ -520,14 +523,15 @@ if __name__ == "__main__":
         "nb_layers_per_block_encoder": 3,
         "nb_layers_bridge": 3,
         "nb_layers_per_block_decoder": 3,
-        "film_dim": 3,  # Dimension of the context vector for FiLM
+        "film_dim": 12,  # Dimension of the context vector for FiLM
         "output_logits": True,  # Whether to output logits or probabilities
     }
     
     # Display the model architecture
     torchinfo.summary(
         UNet1d(**config),
-        input_size=[(1, 3, 120), (1, 3)],
+        input_size=[(10, 3, 120), (1, 12)],
+        device="cpu",
     )
     
     # x = torch.randn(1, 1, 12)
@@ -535,8 +539,8 @@ if __name__ == "__main__":
     # y = film(x, torch.randn(1, 10))
     
     # model = UNet1d(**config)
-    # x = torch.randn(1, 3, 120)
-    # y = model(x, torch.randn(1, 10))
+    # x = torch.randn(2, 3, 120)
+    # y = model(x, torch.randn(1, 12))
     
     # Export the model to ONNX
     # model = UNet1d(**config)
