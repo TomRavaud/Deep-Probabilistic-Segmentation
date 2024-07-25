@@ -74,21 +74,36 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
     ) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set."""
         
-        # TODO: remove masked areas
         # Compute the output of the model
         clines_segmentation_masks = self.forward(batch)
         
         # Get the GT masks
         clines_masks = batch.clines_masks
         
-        # Compute the loss between the model's predictions and the GT masks
-        loss = self._criterion(
+        losses = []
+        
+        for clines_segmentation_mask, clines_mask in zip(
             clines_segmentation_masks,
             clines_masks,
-        )
+        ):
+            # Mask pixels which are inside the borders or which belong to the lines we are
+            # not interested in
+            mask = clines_mask == 127
+            clines_segmentation_mask = clines_segmentation_mask[~mask]
+            clines_mask = clines_mask[~mask]
+            
+            # Convert clines_mask to boolean
+            clines_mask = clines_mask == 255
+            # Convert to float
+            clines_mask = clines_mask.float()
+            
+            losses.append(self._criterion(clines_segmentation_mask, clines_mask))
+
+        loss = torch.mean(torch.stack(losses))
+        
         
         # NOTE: debugging purposes
-        if self.trainer.global_step % 300 == 0:
+        if self.trainer.global_step % 100 == 0:
             idx = 0
             gt = batch.clines_masks[idx].cpu().detach().numpy()
             pred = torch.sigmoid(clines_segmentation_masks[idx]).cpu().detach().numpy()
@@ -126,16 +141,35 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
     ) -> None:
         """Perform a single validation step on a batch of data from the validation
         set.
-        """
+        """ 
         # Compute the output of the model
-        segmentation_masks = self.forward(batch)
+        clines_segmentation_masks = self.forward(batch)
         
-        # Compute the loss between the model's predictions and the GT masks
-        loss = self._criterion(
-            segmentation_masks,
-            batch.masks,
-        )
+        # Get the GT masks
+        clines_masks = batch.clines_masks
+        
+        losses = []
+        
+        for clines_segmentation_mask, clines_mask in zip(
+            clines_segmentation_masks,
+            clines_masks,
+        ):
+            # Mask pixels which are inside the borders or which belong to the lines we
+            # are not interested in
+            mask = clines_mask == 127
+            clines_segmentation_mask = clines_segmentation_mask[~mask]
+            clines_mask = clines_mask[~mask]
+            
+            # Convert clines_mask to boolean
+            clines_mask = clines_mask == 255
+            # Convert to float
+            clines_mask = clines_mask.float()
+            
+            losses.append(self._criterion(clines_segmentation_mask, clines_mask))
 
+        loss = torch.mean(torch.stack(losses))
+        
+        
         # Update and log metric
         self._val_loss(loss)
         self.log(
@@ -163,14 +197,33 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
     ) -> None:
         """Perform a single test step on a batch of data from the test set.
         """
-        # Compute the output of the model
-        segmentation_masks = self.forward(batch)
+         # Compute the output of the model
+        clines_segmentation_masks = self.forward(batch)
         
-        # Compute the loss between the model's predictions and the GT masks
-        loss = self._criterion(
-            segmentation_masks,
-            batch.masks,
-        )
+        # Get the GT masks
+        clines_masks = batch.clines_masks
+        
+        losses = []
+        
+        for clines_segmentation_mask, clines_mask in zip(
+            clines_segmentation_masks,
+            clines_masks,
+        ):
+            # Mask pixels which are inside the borders or which belong to the lines we are
+            # not interested in
+            mask = clines_mask == 127
+            clines_segmentation_mask = clines_segmentation_mask[~mask]
+            clines_mask = clines_mask[~mask]
+            
+            # Convert clines_mask to boolean
+            clines_mask = clines_mask == 255
+            # Convert to float
+            clines_mask = clines_mask.float()
+            
+            losses.append(self._criterion(clines_segmentation_mask, clines_mask))
+
+        loss = torch.mean(torch.stack(losses))
+        
 
         # Update and log metric
         self._test_loss(loss)

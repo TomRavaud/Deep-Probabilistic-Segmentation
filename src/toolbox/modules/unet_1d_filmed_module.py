@@ -112,18 +112,39 @@ class FiLM(nn.Module):
         """Forward pass.
 
         Args:
-            x (torch.Tensor): Input tensor. Shape [B, C, L]. B is the number of lines,
-                C the number of channels and L the length of the line.
-            context (torch.Tensor): Context vector. Shape [1, D]. The same context
-                vector is used for all the lines. D is the dimension of the context
-                space.
+            x (torch.Tensor): Input tensor. Shape [BxN, C, L]. N is the number of lines,
+                C the number of channels and L the length of the line and B the
+                pseudo-batch size (each batch of lines will have its own scale and shift
+                factors).
+            context (torch.Tensor): Context vector. [B, D]. The same context vector is
+                used for all the lines of a same pseudo-batch. D is the dimension of the
+                context space.
 
         Returns:
-            torch.Tensor: Output tensor.
+            torch.Tensor: Output tensor. Shape [BxN, C, L].
+        
+        Raises:
+            ValueError: If the number of lines and/or context vectors is invalid.
         """
+        # We allow to use different context vectors for different lines
+        # - If 1 context vector is provided, we duplicate it for all the lines of the
+        # batch
+        # - If multiple context vectors are provided, 1 context vector is used for
+        # [total number of lines] / [number of context vectors] consecutive lines
+        if x.size(0) % context.size(0) != 0:
+            raise ValueError("Invalid number of lines and/or context vectors")
+        
         # Compute the scale and shift factors
-        gamma = self._gamma_fc(context).unsqueeze(2)  # [1, C, 1]
-        beta = self._beta_fc(context).unsqueeze(2)  # [1, C, 1]
+        gamma = self._gamma_fc(context)
+        beta = self._beta_fc(context)
+        
+        nb_lines_per_batch = x.size(0) // context.size(0)
+        
+        # Expand the gamma and beta vectors to match the number of lines in
+        # the batch
+        gamma = gamma.repeat_interleave(nb_lines_per_batch, 0).unsqueeze(2)
+        beta = beta.repeat_interleave(nb_lines_per_batch, 0).unsqueeze(2)
+        
         
         # Transform the input tensor (broadcasting)
         return gamma * x + beta  # [B, C, L]
@@ -480,9 +501,13 @@ class UNet1d(nn.Module):
         """Forward pass.
 
         Args:
-            x (torch.Tensor): Input tensor.
-            context (torch.Tensor, optional): Context vector for FiLM. Defaults to
-                None.
+            x (torch.Tensor): Input tensor. Shape [BxN, C, L]. N is the number of lines,
+                C the number of channels and L the length of the line and B the
+                pseudo-batch size (e.g. 2 sets of 8 lines extracted from 2 images could
+                be processed as 2 pseudo-batches of 8 lines, since the context vector
+                is shared for all the lines of a same pseudo-batch).
+            context (torch.Tensor, optional): Context vector for FiLM. Shape [B, D].
+                Defaults to None.
 
         Raises:
             ValueError: If the width of the input tensor is not divisible by the scale
@@ -528,19 +553,19 @@ if __name__ == "__main__":
     }
     
     # Display the model architecture
-    torchinfo.summary(
-        UNet1d(**config),
-        input_size=[(10, 3, 120), (1, 12)],
-        device="cpu",
-    )
+    # torchinfo.summary(
+    #     UNet1d(**config),
+    #     input_size=[(10, 3, 120), (1, 12)],
+    #     device="cpu",
+    # )
     
     # x = torch.randn(1, 1, 12)
     # film = FiLM(1, 10)
     # y = film(x, torch.randn(1, 10))
     
     # model = UNet1d(**config)
-    # x = torch.randn(2, 3, 120)
-    # y = model(x, torch.randn(1, 12))
+    # x = torch.randn(10*8, 3, 120)
+    # y = model(x, torch.randn(8, 12))
     
     # Export the model to ONNX
     # model = UNet1d(**config)

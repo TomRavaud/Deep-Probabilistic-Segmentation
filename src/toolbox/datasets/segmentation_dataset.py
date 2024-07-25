@@ -459,7 +459,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             obs_clines_mask_path =\
                 obs_clines_path / f"{key}_{object_data.unique_id}.clines.seg.npy"
 
-            # Check the files exist
+            # Check that the files exist
             if not obs_clines_rgb_path.exists() or not obs_clines_mask_path.exists():
                 return None
 

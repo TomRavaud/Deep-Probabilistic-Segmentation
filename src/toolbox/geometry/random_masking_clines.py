@@ -50,6 +50,7 @@ def get_valid_clines(
         lines_to_keep = np.isclose(
                 np.sum(np.diff(seg, axis=-1), axis=-1), 255  # 0 - 1
         )
+        seg *= 255
     else:
         # Keep only the lines where the change is 255
         lines_to_keep = np.isclose(
@@ -68,16 +69,17 @@ def get_valid_clines(
         else:
             raise ValueError(f"Invalid lines_padding: {lines_padding}")
         
+        seg *= 255
+        
         # Mask the points which are outside the image or in the border
         seg[:, :clip_width] = 127
         seg[:, -clip_width:] = 127
     
-    # Keep only the lines of interest
-    rgb = rgb[lines_to_keep]
+    # Mask the lines we are not interested in
+    rgb[~lines_to_keep] = 0
     
-    seg *= 255
-    # Keep only the lines of interest
-    seg = seg[lines_to_keep]
+    # Mask the lines we are not interested in
+    seg[~lines_to_keep] = 127
     
     return rgb, seg
 

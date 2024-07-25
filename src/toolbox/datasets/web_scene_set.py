@@ -59,17 +59,17 @@ class WebSceneSet(SceneSet):
         )
         
         # Load the dataframe mapping scene_is and view_id to shard_id and key
-        feather_path = self.wds_dir / "frame_index.feather"
-        self._index_df = feather.read_feather(feather_path)
+        # feather_path = self.wds_dir / "frame_index.feather"
+        # self._index_df = feather.read_feather(feather_path)
         
-    @property
-    def index_df(self) -> pd.DataFrame:
-        """Get the index dataframe.
+    # @property
+    # def index_df(self) -> pd.DataFrame:
+    #     """Get the index dataframe.
 
-        Returns:
-            pd.DataFrame: The index dataframe.
-        """
-        return self._index_df
+    #     Returns:
+    #         pd.DataFrame: The index dataframe.
+    #     """
+    #     return self._index_df
 
     def get_tar_list(self) -> List[str]:
         """Get the list of tar files in the dataset directory.
@@ -113,7 +113,7 @@ def load_scene_ds_obs(
     depth_scale: float = 1000.0,
     load_depth: bool = False,
     label_format: str = "{label}",
-    index_df: pd.DataFrame = None,
+    # index_df: pd.DataFrame = None,
 ) -> SceneObservation:
     
     assert isinstance(sample["rgb.png"], bytes)
@@ -140,21 +140,42 @@ def load_scene_ds_obs(
     camera_data = CameraData.from_json(sample["camera_data.json"])
     infos = ObservationInfos.from_json(sample["infos.json"])
     
-    # If the index dataframe is provided, we can extract the key and the shard_id
-    if index_df is not None:
-        scene_id = infos.scene_id
-        view_id = infos.view_id
+    
+    #TODO: to clean
+    index_frame_dir = Path("data/webdatasets/frame_index")
+    
+    scene_id = infos.scene_id
+    view_id = infos.view_id
+    
+    # Read the corresponding row from the index dataframe
+    df = feather.read_feather(index_frame_dir / f"{scene_id}.feather")
+    row = df[df.view_id == view_id]
+    
+    # Extract the key and the shard_id
+    key = row["key"].values[0]
+    shard_id = row["shard_id"].values[0]
+    
+    # Add the key and the shard_id to the infos
+    infos.key = key
+    infos.shard_id = shard_id
+    
+    # # If the index dataframe is provided, we can extract the key and the shard_id
+    # if index_df is not None:
+    #     scene_id = infos.scene_id
+    #     view_id = infos.view_id
         
-        # Read the corresponding row from the index dataframe
-        row = index_df[(index_df.scene_id == scene_id) & (index_df.view_id == view_id)]
+    #     # Read the corresponding row from the index dataframe
+    #     row = index_df[(index_df.scene_id == scene_id) & (index_df.view_id == view_id)]
         
-        # Extract the key and the shard_id
-        key = row["key"].values[0]
-        shard_id = row["shard_id"].values[0]
+    #     # Extract the key and the shard_id
+    #     key = row["key"].values[0]
+    #     shard_id = row["shard_id"].values[0]
         
-        # Add the key and the shard_id to the infos
-        infos.key = key
-        infos.shard_id = shard_id
+    #     # Add the key and the shard_id to the infos
+    #     infos.key = key
+    #     infos.shard_id = shard_id
+    
+    
     
     return SceneObservation(
         rgb=rgb,
@@ -187,7 +208,7 @@ class IterableWebSceneSet(IterableSceneSet):
             # depth_scale=self.web_scene_set.depth_scale,
             load_depth=self.web_scene_set.load_depth,
             label_format=self.web_scene_set.label_format,
-            index_df=self.web_scene_set.index_df,
+            # index_df=self.web_scene_set.index_df,
         )
 
         def load_scene_ds_obs_iterator(

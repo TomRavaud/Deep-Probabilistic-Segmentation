@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - data: train/gso_1K
+  - data: train/gso_10
   - model: train/gso_clines
   - callbacks: default
   - logger: default

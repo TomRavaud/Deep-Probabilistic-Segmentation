@@ -1,4 +1,4 @@
-_target_: models.object_segmentation_module.ObjectSegmentationCLinesLitModule
+_target_: models.object_segmentation_clines_module.ObjectSegmentationCLinesLitModule
 
 optimizer:
   _target_: torch.optim.Adam
@@ -7,23 +7,30 @@ optimizer:
   weight_decay: 0.00001
 
 scheduler:
-  main_scheduler:
-    _target_: torch.optim.lr_scheduler.SequentialLR
-    _partial_: true 
-    milestones: [1]
+  _target_: torch.optim.lr_scheduler.LinearLR
+  _partial_: true
+  start_factor: 1.0
+  end_factor: 0.5
+  total_iters: 50
+
+# scheduler:
+#   main_scheduler:
+#     _target_: torch.optim.lr_scheduler.SequentialLR
+#     _partial_: true 
+#     milestones: [1]
   
-  sub_schedulers:
-    - _target_: torch.optim.lr_scheduler.LinearLR
-      _partial_: true
-      start_factor: 0.0001
-      end_factor: 1.0
-    - _target_: torch.optim.lr_scheduler.MultiStepLR
-      _partial_: true
-      milestones: [100, 180, 240, 280]
-      gamma: 0.5
+#   sub_schedulers:
+#     - _target_: torch.optim.lr_scheduler.LinearLR
+#       _partial_: true
+#       start_factor: 0.0001
+#       end_factor: 1.0
+#     - _target_: torch.optim.lr_scheduler.MultiStepLR
+#       _partial_: true
+#       milestones: [100, 180, 240, 280]
+#       gamma: 0.5
 
 model:
-  _target_: models.components.object_segmentation_model.ObjectSegmentationCLinesModel
+  _target_: models.components.object_segmentation_clines_model.ObjectSegmentationCLinesModel
 
   probabilistic_segmentation_model:
     _target_: toolbox.modules.probabilistic_segmentation_unet.ProbabilisticSegmentationUNet
@@ -39,9 +46,9 @@ model:
       in_channels: 3
       out_channels: 1
       channels_list: [16, 32, 64, 128]
-      nb_layers_per_block_encoder: 3
-      nb_layers_bridge: 3
-      nb_layers_per_block_decoder: 3
+      nb_layers_per_block_encoder: 2
+      nb_layers_bridge: 2
+      nb_layers_per_block_decoder: 2
       film_dim: 512
       output_logits: true
 

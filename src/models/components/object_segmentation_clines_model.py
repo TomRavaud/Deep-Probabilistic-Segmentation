@@ -32,8 +32,7 @@ class ObjectSegmentationCLinesModel(nn.Module):
         clines_probabilistic_masks = self._probabilistic_segmentation_model(
             x.rgbs,
             x.masks.unsqueeze(1),
-            x.clines_rgb,
-            x.clines_binary_masks,
+            x.clines_rgbs,
         )
         
         return clines_probabilistic_masks

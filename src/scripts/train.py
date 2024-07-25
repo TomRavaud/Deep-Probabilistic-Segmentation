@@ -17,7 +17,7 @@ from lightning import (
     seed_everything,
 )
 from lightning.pytorch.loggers import Logger
-# import cv2
+import cv2
 
 # Custom modules
 from toolbox.utils.pylogger import RankedLogger
@@ -47,7 +47,7 @@ def train(cfg: DictConfig) -> tuple:
     
     # datamodule.setup()
     
-    # Get 1st data
+    # # Get 1st data
     # batch = next(iter(datamodule.train_dataloader()))
     
     # # Visualize the data
@@ -60,13 +60,19 @@ def train(cfg: DictConfig) -> tuple:
     #     # Image to BGR
     #     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
-    #     # Draw the bounding box
-    #     bbox = batch.bboxes[i].numpy()
-    #     bbox = bbox.astype(int)
-    #     cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
+    #     clines_rgb = batch.clines_rgbs[i].permute(1, 2, 0).numpy()
+    #     clines_rgb = cv2.cvtColor(clines_rgb, cv2.COLOR_RGB2BGR)
         
-    #     cv2.imshow("Image", img)
-    #     cv2.waitKey(0)
+    #     # Save the clines
+    #     # cv2.imwrite(f"z_clines_{i}.png", clines_rgb)
+        
+    #     # Draw the bounding box
+    #     # bbox = batch.bboxes[i].numpy()
+    #     # bbox = bbox.astype(int)
+    #     # cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
+        
+    #     # cv2.imshow("Image", img)
+    #     # cv2.waitKey(0)
     
     
     log.info(f"Instantiating model <{cfg.model._target_}>")
