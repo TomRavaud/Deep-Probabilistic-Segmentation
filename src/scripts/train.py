@@ -57,7 +57,6 @@ def train(cfg: DictConfig) -> tuple:
         
     #     # Get the image
     #     img = batch.rgbs[i].permute(1, 2, 0).numpy()
-        
     #     # Image to BGR
     #     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         

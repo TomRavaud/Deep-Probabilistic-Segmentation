@@ -1,0 +1,64 @@
+_target_: models.object_segmentation_module.ObjectSegmentationCLinesLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.00001
+
+scheduler:
+  main_scheduler:
+    _target_: torch.optim.lr_scheduler.SequentialLR
+    _partial_: true 
+    milestones: [1]
+  
+  sub_schedulers:
+    - _target_: torch.optim.lr_scheduler.LinearLR
+      _partial_: true
+      start_factor: 0.0001
+      end_factor: 1.0
+    - _target_: torch.optim.lr_scheduler.MultiStepLR
+      _partial_: true
+      milestones: [100, 180, 240, 280]
+      gamma: 0.5
+
+model:
+  _target_: models.components.object_segmentation_model.ObjectSegmentationCLinesModel
+
+  probabilistic_segmentation_model:
+    _target_: toolbox.modules.probabilistic_segmentation_unet.ProbabilisticSegmentationUNet
+    net:
+      _target_: toolbox.modules.simple_resnet_module.SimpleResNet
+      version: 34
+      nb_input_channels: 4
+      output_dim: [512,]
+      output_logits: true
+
+    line_segmentation_model:
+      _target_: toolbox.modules.unet_1d_filmed_module.UNet1d
+      in_channels: 3
+      out_channels: 1
+      channels_list: [16, 32, 64, 128]
+      nb_layers_per_block_encoder: 3
+      nb_layers_bridge: 3
+      nb_layers_per_block_decoder: 3
+      film_dim: 512
+      output_logits: true
+
+    apply_color_transformations: true
+
+criterion:
+  _target_: models.components.segmentation_losses.FocalDiceCombinationLoss
+
+  # Focal loss parameters
+  gamma: 2.0  # Focusing parameter
+  alpha: 0.25  # Balancing parameter (percentage of negative samples)
+
+  # Dice loss parameters
+  smooth: 1.0  # Smoothing factor
+
+  with_logits: true  # If 'true', sigmoid activation is applied
+
+  # Weights for the Focal and Dice losses
+  k_focal: 20.0
+  k_dice: 1.0

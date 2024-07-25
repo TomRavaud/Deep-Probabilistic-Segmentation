@@ -5,6 +5,7 @@ from typing import List, Optional, Union, Set, Iterator, Tuple
 import time
 from dataclasses import dataclass, replace
 import random
+from pathlib import Path
 
 # Third-party libraries
 import torch
@@ -18,6 +19,7 @@ from toolbox.datasets.scene_set import (
     SceneObservation,
     ObjectData,
 )
+from toolbox.geometry.random_masking_clines import get_valid_clines
 
 
 @dataclass
@@ -35,6 +37,8 @@ class SegmentationData:
     """
     rgb: np.ndarray
     mask: np.ndarray
+    clines_rgb: np.ndarray
+    clines_mask: np.ndarray
     bbox: np.ndarray
     TCO: np.ndarray
     DTO: np.ndarray
@@ -57,6 +61,8 @@ class BatchSegmentationData:
     """
     rgbs: torch.Tensor
     masks: torch.Tensor
+    clines_rgbs: torch.Tensor
+    clines_masks: torch.Tensor
     object_datas: List[ObjectData]
     bboxes: torch.Tensor
     TCO: torch.Tensor
@@ -72,6 +78,8 @@ class BatchSegmentationData:
         """
         self.rgbs = self.rgbs.pin_memory()
         self.masks = self.masks.pin_memory()
+        self.clines_rgbs = self.clines_rgbs.pin_memory()
+        self.clines_masks = self.clines_masks.pin_memory()
         self.bboxes = self.bboxes.pin_memory()
         self.TCO = self.TCO.pin_memory()
         self.DTO = self.DTO.pin_memory()
@@ -121,6 +129,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         rgb_augmentations: Optional[SceneObservationTransform] = None,
         depth_augmentations: Optional[SceneObservationTransform] = None,
         background_augmentations: Optional[SceneObservationTransform] = None,
+        clines_dir: Optional[str] = None,
     ) -> None:
         """Initialize the ObjectSegmentationDataset.
 
@@ -145,6 +154,8 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             background_augmentations (Optional[SceneObservationTransform], optional):
                 Augmentations to apply to the background of the observation. Defaults
                 to [].
+            clines_dir (Optional[str], optional): Directory containing the correspondences
+                lines. Defaults to None.
         """
         self._scene_set = scene_set
         self._min_area = min_area
@@ -165,6 +176,8 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         
         # Timings to construct the data from the observation
         self._timings = None
+        
+        self._clines_dir = clines_dir
     
     @staticmethod
     def collate_fn(list_data: List[SegmentationData]) -> BatchSegmentationData:
@@ -185,6 +198,14 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 2,
             ),
             masks=torch.from_numpy(np.stack([d.mask for d in list_data])),
+            clines_rgbs=torch.from_numpy(
+                np.stack([d.clines_rgb for d in list_data])).permute(
+                0,
+                3,
+                1,
+                2,
+            ),
+            clines_masks=torch.from_numpy(np.stack([d.clines_mask for d in list_data])),
             bboxes=torch.from_numpy(np.stack([d.bbox for d in list_data])),
             K=torch.from_numpy(np.stack([d.K for d in list_data])),
             TCO=torch.from_numpy(np.stack([d.TCO for d in list_data])),
@@ -422,10 +443,42 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         else:
             DTO = np.eye(4, dtype=np.float32)
         
+        
+        if self._clines_dir is None:
+            clines_rgb = np.zeros((1, 1, 3))
+            clines_mask = np.zeros((1, 1))
+        
+        else:
+            # Load the correspondence lines and mask
+            shard_id = obs.infos.shard_id
+            key = obs.infos.key
+
+            obs_clines_path = Path(self._clines_dir) / f"{shard_id}"
+            obs_clines_rgb_path =\
+                obs_clines_path / f"{key}_{object_data.unique_id}.clines.rgb.npy"
+            obs_clines_mask_path =\
+                obs_clines_path / f"{key}_{object_data.unique_id}.clines.seg.npy"
+
+            # Check the files exist
+            if not obs_clines_rgb_path.exists() or not obs_clines_mask_path.exists():
+                return None
+
+            clines_rgb = np.load(obs_clines_rgb_path)
+            clines_mask = np.load(obs_clines_mask_path)
+        
+            # Process the lines
+            clines_rgb, clines_mask = get_valid_clines(
+                clines_rgb,
+                clines_mask,
+                lines_padding="repeat",
+            )
+        
         # Add depth to SegmentationData
         data = SegmentationData(
             rgb=obs.rgb,
             mask=(obs.segmentation == object_data.unique_id).astype(np.float32),
+            clines_rgb=clines_rgb,
+            clines_mask=clines_mask,
             depth=obs.depth if obs.depth is not None else None,
             bbox=object_data.bbox_modal,
             K=obs.camera_data.K,

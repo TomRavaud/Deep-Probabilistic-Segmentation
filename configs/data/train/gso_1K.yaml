@@ -70,6 +70,8 @@ dataset_cfg:
   rel_translation_scale: 0.3  # normalized units
   abs_rotation_scale: 20.0  # degrees
 
+  clines_dir: ${paths.data_dir}/gso_1M_clines
+
 # Dataloader parameters
 dataloader_cfg:
   batch_size: 32

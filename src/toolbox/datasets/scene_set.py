@@ -175,6 +175,8 @@ class CameraData:
 class ObservationInfos:
     scene_id: str
     view_id: str
+    shard_id: Optional[str] = None
+    key: Optional[str] = None
 
     def to_json(self) -> str:
         return json.dumps(self.__dict__)

@@ -11,6 +11,7 @@ import webdataset as wds
 import numpy as np
 import imageio
 import io
+import pyarrow.feather as feather
 
 # Custom modules
 from toolbox.utils.webdataset import tarfile_to_samples
@@ -56,6 +57,19 @@ class WebSceneSet(SceneSet):
             load_depth=load_depth,
             load_segmentation=load_segmentation,
         )
+        
+        # Load the dataframe mapping scene_is and view_id to shard_id and key
+        feather_path = self.wds_dir / "frame_index.feather"
+        self._index_df = feather.read_feather(feather_path)
+        
+    @property
+    def index_df(self) -> pd.DataFrame:
+        """Get the index dataframe.
+
+        Returns:
+            pd.DataFrame: The index dataframe.
+        """
+        return self._index_df
 
     def get_tar_list(self) -> List[str]:
         """Get the list of tar files in the dataset directory.
@@ -99,6 +113,7 @@ def load_scene_ds_obs(
     depth_scale: float = 1000.0,
     load_depth: bool = False,
     label_format: str = "{label}",
+    index_df: pd.DataFrame = None,
 ) -> SceneObservation:
     
     assert isinstance(sample["rgb.png"], bytes)
@@ -124,7 +139,23 @@ def load_scene_ds_obs(
 
     camera_data = CameraData.from_json(sample["camera_data.json"])
     infos = ObservationInfos.from_json(sample["infos.json"])
-
+    
+    # If the index dataframe is provided, we can extract the key and the shard_id
+    if index_df is not None:
+        scene_id = infos.scene_id
+        view_id = infos.view_id
+        
+        # Read the corresponding row from the index dataframe
+        row = index_df[(index_df.scene_id == scene_id) & (index_df.view_id == view_id)]
+        
+        # Extract the key and the shard_id
+        key = row["key"].values[0]
+        shard_id = row["shard_id"].values[0]
+        
+        # Add the key and the shard_id to the infos
+        infos.key = key
+        infos.shard_id = shard_id
+    
     return SceneObservation(
         rgb=rgb,
         depth=depth,
@@ -150,12 +181,13 @@ class IterableWebSceneSet(IterableSceneSet):
             Iterator: Iterator over SceneObservation objects.
         """
         self.web_scene_set = web_scene_set
-
+        
         load_scene_ds_obs_ = partial(
             load_scene_ds_obs,
             # depth_scale=self.web_scene_set.depth_scale,
             load_depth=self.web_scene_set.load_depth,
             label_format=self.web_scene_set.label_format,
+            index_df=self.web_scene_set.index_df,
         )
 
         def load_scene_ds_obs_iterator(

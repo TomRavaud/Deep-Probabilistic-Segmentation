@@ -52,13 +52,8 @@ def extract_contour_points_and_normals(mask, num_points_on_contour=200):
     # Interpolate the contour to compute normals
     try:
         tck, u = interpolate.splprep(contour.T, per=True)
-    except ValueError:
-        print(contour)
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        plt.imshow(mask)
-        fig.savefig("mask.png")
-        exit()
+    except TypeError:
+        return None, None
     
     tii = np.linspace(
         0, contour.shape[0], num_points_on_contour, endpoint=False, dtype=int
@@ -66,14 +61,14 @@ def extract_contour_points_and_normals(mask, num_points_on_contour=200):
     points = contour[tii].astype(np.float32)
 
     tangents = np.asarray(interpolate.splev(u[tii], tck, der=1)).T
-    tangents /= np.linalg.norm(tangents, axis=1, keepdims=True)
+    tangents /= np.linalg.norm(tangents, axis=1, keepdims=True) + 1e-6
     normals = (np.asarray([[0, -1], [1, 0]]) @ tangents.T).T
-
+    
     return points, normals
 
 def _line(p, t, n=100):
     """
-    Given a point (x,y) and tangent(dx,dy) return a set of points M*2
+    Given a point (x,y) and tangent (dx,dy) return a set of points M*2
     """
     return np.asarray(
         skimage.draw.line(
@@ -95,19 +90,19 @@ def extract_contour_lines(points, normals, line_size_half):
     """
     # from float normals to lines in image
     outer_lines = [
-        _line(p, t, n=line_size_half * 10)[1 : line_size_half + 1]
+        _line(p, t, n=line_size_half * 5)[1 : line_size_half + 1]
         for p, t in zip(points, normals)
     ]
     inner_lines = [
-        _line(p, -t, n=line_size_half * 10)[:line_size_half][::-1]
+        _line(p, -t, n=line_size_half * 5)[:line_size_half][::-1]
         for p, t in zip(points, normals)
     ]
     try:
         outer_lines = np.stack(outer_lines)
         inner_lines = np.stack(inner_lines)
     except ValueError:
-        print("not enough points for some of the line")
-        exit(1)
+        # Not enough points for some of the line
+        return None
     clines = np.concatenate((inner_lines, outer_lines), axis=1)
 
     return clines
@@ -152,6 +147,6 @@ def apply_homography_to_points_with_normals(points, normals, H):
     points_transformed = apply_homography(points, H)
     tmp = apply_homography(points + normals, H)
     normals_transformed = tmp - points_transformed
-    normals_transformed /= np.linalg.norm(normals_transformed, axis=1, keepdims=True)
+    normals_transformed /= np.linalg.norm(normals_transformed, axis=1, keepdims=True) + 1e-6
     
     return points_transformed, normals_transformed
