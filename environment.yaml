@@ -30,4 +30,5 @@ dependencies:
     - torchinfo==1.8.0
     - rich==13.7.1
     - scikit-image==0.24.0
+    - python-libarchive==4.2.1
     - git+https://github.com/ChaoningZhang/MobileSAM.git

@@ -1,3 +1,8 @@
+"""
+Script to evaluate an object probabilistic segmentation model on small sequences
+of images (a global representation of the scene is predicted from the first frame
+and used to predict the object segmentation in the following frames).
+"""
 # Standard libraries
 import pathlib
 import sys
@@ -12,11 +17,6 @@ from omegaconf import DictConfig
 import torch
 from tqdm import tqdm
 import numpy as np
-
-# # Custom modules
-# from toolbox.utils.instantiators import instantiate_callbacks, instantiate_loggers
-# from toolbox.utils.logging_utils import log_hyperparameters
-# from toolbox.utils.utils import get_metric_value
 
 
 def evaluate(cfg: DictConfig):

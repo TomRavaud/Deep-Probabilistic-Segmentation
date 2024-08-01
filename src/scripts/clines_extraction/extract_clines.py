@@ -1,9 +1,12 @@
+"""
+Script to compute and save correspondence lines coordinates for each object in a
+dataset (MegaPose format). Lines can then be extracted from the images during the
+data loading process.
+"""
 # Standard libraries
 from pathlib import Path
 import json
 import sys
-# import tarfile
-import libarchive
 import multiprocessing
 from functools import partial
 from time import time
@@ -17,6 +20,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import libarchive
 
 # Custom modules
 from toolbox.geometry.clines import (
@@ -28,8 +32,19 @@ from toolbox.geometry.clines import (
 )
 
 
-def extract_clines(shard_ids, config):
-    
+def extract_clines(shard_ids: list[str], config: dict) -> None:
+    """Extract correspondence lines for each object in some shards of a dataset.
+
+    Args:
+        shard_ids (list[str]): List of shard ids to process.
+        config (dict): Configuration dictionary with the following keys:
+            - num_points_on_contour (int): Number of points to extract from the contour.
+            - line_size_half (int): Half the size of the lines to extract.
+            - homography_scale (float): Scale of the homography to apply.
+            - min_area (int): Minimum area of the object to consider it.
+            - data_path (str): Path to the dataset.
+            - dataset_name (str): Name of the dataset.
+    """
     for shard_id in shard_ids:
 
         print(f"Processing shard {shard_id}")
@@ -51,13 +66,7 @@ def extract_clines(shard_ids, config):
             counter = 0
             
             for entry in shard:
-                
-                # if "rgb.png" in entry.pathname:
-                #     # Read the RGB image
-                #     rgb_file = shard.read(size=entry.size)
-                #     counter += 1
                 if "segmentation.png" in entry.pathname:
-                # elif "segmentation.png" in entry.pathname:
                     # Read the segmentation image
                     segmentation_file = shard.read(size=entry.size)
                     counter += 1
@@ -67,16 +76,9 @@ def extract_clines(shard_ids, config):
                     counter += 1
                 
                 if counter == 2:
-                # if counter == 3:
-                    
                     # Reset the counter
                     counter = 0
                     
-                    # # Load the RGB image
-                    # rgb = cv2.imdecode(
-                    #     np.frombuffer(rgb_file, np.uint8), cv2.IMREAD_COLOR
-                    # )
-                    # rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
                     # Load the semantic segmentation data
                     segmentation = cv2.imdecode(
                         np.frombuffer(segmentation_file, np.uint8),
@@ -94,9 +96,9 @@ def extract_clines(shard_ids, config):
                     # Create a directory for the image
                     (output_path / img_id).mkdir(exist_ok=True)
                     
+                    # List of object ids
                     oids = []
-                    # clines_rgb_list = []
-                    # clines_seg_list = []
+                    # List of correspondence lines to save
                     clines_list = []
                     
                     # Process each object
@@ -106,15 +108,17 @@ def extract_clines(shard_ids, config):
                             # Get the object id
                             oid = obj["unique_id"]
 
-                            # # If the files already exist, skip
-                            # if (output_path / f"{img_id}_{oid}.clines.rgb.npy").exists() and\
-                            #     (output_path / f"{img_id}_{oid}.clines.seg.npy").exists():
-                            #         continue
+                            # If the files already exist, skip
+                            if (output_path / f"{img_id}_{oid}.clines.rgb.npy").exists()\
+                                and (output_path /\
+                                    f"{img_id}_{oid}.clines.seg.npy").exists():
+                                    continue
 
                             # Get the bounding box of the visible part of the object
                             bbox_modal = np.array(obj["bbox_modal"])
                             # Area of the box
-                            area = (bbox_modal[3] - bbox_modal[1]) * (bbox_modal[2] - bbox_modal[0])
+                            area = (bbox_modal[3] - bbox_modal[1])\
+                                * (bbox_modal[2] - bbox_modal[0])
 
                             # Filter objects with low visibility
                             if oid not in unique_ids_visible or\
@@ -125,13 +129,20 @@ def extract_clines(shard_ids, config):
                             mask = (segmentation == oid).astype(np.uint8)
                             mask = extract_only_largest_contour(mask)
                             points, normals = extract_contour_points_and_normals(
-                                mask, num_points_on_contour=config["num_points_on_contour"]
+                                mask,
+                                num_points_on_contour=config["num_points_on_contour"],
                             )
                             if points is None:
                                 continue
-                            H = random_homography_from_points(points, scale=config["homography_scale"])
+                            H = random_homography_from_points(
+                                points,
+                                scale=config["homography_scale"],
+                            )
                             points_transformed, normals_transformed = (
-                                apply_homography_to_points_with_normals(points, normals, H)
+                                apply_homography_to_points_with_normals(
+                                    points,
+                                    normals, H,
+                                )
                             )
                             clines = extract_contour_lines(
                                 points_transformed,
@@ -143,84 +154,17 @@ def extract_clines(shard_ids, config):
                             
                             clines = clines.astype(np.int32)
                             
-                            # # Find points that are inside and outside the image
-                            # clines_valid = np.bitwise_and(
-                            #     np.all(clines >= (0, 0), axis=-1),
-                            #     np.all(clines < np.array(mask.shape), axis=-1),
-                            # )
-                            
-                            # # Fill the contour lines with RGB data, and 0 for points outside the
-                            # # image
-                            # clines_rgb = np.zeros(clines.shape[:2] + (3,), np.uint8)
-                            # clines_rgb[clines_valid] = rgb[
-                            #     clines[clines_valid][:, 0], clines[clines_valid][:, 1]
-                            # ]
-                            # # Set the segmentation data for the contour lines, and 5 for points
-                            # # outside the image
-                            # clines_seg = np.ones(clines.shape[:2], np.uint8) * 5
-                            # clines_seg[clines_valid] = mask[
-                            #     clines[clines_valid][:, 0], clines[clines_valid][:, 1]
-                            # ]
-                        
                         except Exception as e:
                             print(f"Error in {img_id}_{oid}: {e}")
                             continue
 
-                        # Save the contour lines
-                        # np.save(output_path / f"{img_id}_{oid}.clines.rgb.npy", clines_rgb)
-                        # np.save(output_path / f"{img_id}_{oid}.clines.seg.npy", clines_seg)
-                        
                         oids.append(oid)
-                        # clines_rgb_list.append(clines_rgb)
-                        # clines_seg_list.append(clines_seg)
                         clines_list.append(clines)
                         
-                        
-                        
-                        # Save the figures if required
-                        if config["save_figures"]:
-                            rgb_with_clines = rgb.copy()
-                            clines_x, clines_y = clines[clines_valid].T
-                            rgb_with_clines[clines_x, clines_y] = (0, 0, 255)
-
-                            fig: plt.Figure
-                            fig, axes = plt.subplots(2, 2, squeeze=False)
-                            ax: plt.Axes = axes[0, 0]
-                            ax.imshow(rgb_with_clines)
-                            ax.set_title("RGB")
-                            ax.axis("off")
-                            ax: plt.Axes = axes[0, 1]
-                            ax.imshow(mask.astype(np.uint8) * 255, cmap="bwr")
-                            ax.set_title("Segmentation")
-                            ax.axis("off")
-
-                            ax: plt.Axes = axes[1, 0]
-                            rgb_show = clines_rgb.copy()
-                            rgb_show[np.isnan(rgb_show)] = 0
-                            ax.imshow(rgb_show.astype(np.uint8))
-                            ax.set_title("Contour lines RGB")
-                            ax.axis("off")
-
-                            ax: plt.Axes = axes[1, 1]
-                            seg_show = clines_seg.copy()
-                            seg_show *= 255
-                            seg_show[np.isnan(seg_show)] = 128
-                            ax.imshow(seg_show.astype(np.uint8), cmap="bwr", vmin=0, vmax=255)
-                            ax.set_title("Contour lines Segmentation")
-                            ax.axis("off")
-
-                            fig.savefig(output_path / f"clines_{img_id}_{oid}.png")
-                            plt.close(fig)
-                    
                     # Save the contour lines
                     for oid, clines in zip(oids, clines_list):
                         np.save(output_path / img_id / f"{oid}.clines.npy", clines)
-                    # for oid, clines_rgb, clines_seg in zip(oids, clines_rgb_list, clines_seg_list):
-                    #     np.save(output_path / img_id / f"{oid}.clines.rgb.npy", clines_rgb)
-                    #     np.save(output_path / img_id / f"{oid}.clines.seg.npy", clines_seg)
-                        # np.save(output_path / f"{img_id}_{oid}.clines.rgb.npy", clines_rgb)
-                        # np.save(output_path / f"{img_id}_{oid}.clines.seg.npy", clines_seg)
-                    
+        
         print(f"Shard {shard_id} processed in {time()-start:.2f} seconds")
 
 
@@ -233,7 +177,6 @@ if __name__ == "__main__":
         "line_size_half": 60,
         "homography_scale": 0.1,
         "min_area": 9000,
-        "save_figures": False,
         "data_path": "data/webdatasets",
         "dataset_name": "gso_1M",
     }
@@ -243,7 +186,8 @@ if __name__ == "__main__":
     extract_clines_partial = partial(extract_clines, config=config)
     
     # Create the output directory if it does not exist
-    (Path(config["data_path"]) / (config["dataset_name"]+"_clines_to_remove")).mkdir(exist_ok=True)
+    (Path(config["data_path"]) /\
+        (config["dataset_name"]+"_clines_to_remove")).mkdir(exist_ok=True)
 
     # Get the shard ids
     dataset_path = Path(config["data_path"]) / config["dataset_name"]
@@ -255,5 +199,3 @@ if __name__ == "__main__":
     
     with multiprocessing.Pool(20) as pool:
         pool.map(extract_clines_partial, shard_ids_split)
-    
-    # extract_clines_partial(shard_ids[0:1])

@@ -254,7 +254,6 @@ class ProbabilisticSegmentationLookup(ProbabilisticSegmentationBase):
             input_implicit_segmentation,
         )
         
-        # TODO: Add some random noise the RGB images to make the segmentation model more robust
         # Generate the segmentation masks
         probabilistic_masks = self._masks_by_lookup(
             rgb_images,

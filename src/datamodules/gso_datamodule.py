@@ -1,3 +1,7 @@
+"""
+Lightning component used to load and prepare the data on which to train, validate, and
+test the models.
+"""
 # Standard libraries
 from typing import Any, Dict, Optional
 
@@ -24,34 +28,6 @@ class GSODataModule(LightningDataModule):
     This DataModule gathers all the necessary steps to load this GSO-based synthetic
     dataset and prepare it for training, validation, and testing. It also includes the
     transformations to apply to the data.
-
-    A `LightningDataModule` implements 7 key methods:
-
-    ```python
-        def prepare_data(self):
-        # Things to do on 1 GPU/TPU (not on every GPU/TPU in DDP).
-        # Download data, pre-process, split, save to disk, etc...
-
-        def setup(self, stage):
-        # Things to do on every process in DDP.
-        # Load data, set variables, etc...
-
-        def train_dataloader(self):
-        # return train dataloader
-
-        def val_dataloader(self):
-        # return validation dataloader
-
-        def test_dataloader(self):
-        # return test dataloader
-
-        def predict_dataloader(self):
-        # return predict dataloader
-
-        def teardown(self, stage):
-        # Called on every process in DDP.
-        # Clean up after fit or test.
-    ```
     """  
     def __init__(
         self,
@@ -133,24 +109,16 @@ class GSODataModule(LightningDataModule):
         
     def prepare_data(self) -> None:
         """
-        Download the dataset. This method is called on 1 GPU/TPU in distributed
-        training.
+        Prepare data. This method is called on 1 GPU/TPU in distributed training.
         """
-        #TODO: Add code to download the dataset and the models, if not already downloaded.
         pass
 
     def setup(self, stage: Optional[str] = None) -> None:
-        """Load data. Set variables: `self.data_train`, `self.data_val`,
-        `self.data_test`.
+        """Set up the data for the training, validation, and testing dataloaders.
 
-        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`,
-        `trainer.test()`, and `trainer.predict()`, so be careful not to execute things
-        like random split twice! Also, it is called after `self.prepare_data()` and
-        there is a barrier in between which ensures that all the processes proceed to
-        `self.setup()` once the data is prepared and available for use.
-
-        :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or
-            `"predict"`. Defaults to ``None``.
+        Args:
+            stage (Optional[str], optional): The stage to set up. Either `"fit"`,
+                `"validate"`, `"test"`, or `"predict"`. Defaults to None.
         """
         # Load and split datasets only if not loaded already
         if not self._data_train and not self._data_val and not self._data_test:
@@ -195,61 +163,64 @@ class GSODataModule(LightningDataModule):
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
 
-        :return: The train dataloader.
+        Returns:
+            DataLoader[Any]: The train dataloader.
         """
         return DataLoader(
             dataset=self._data_train,
             collate_fn=ObjectSegmentationDataset.collate_fn,
-            # worker_init_fn=worker_init_fn,
             **self.hparams.dataloader_cfg,
         )
 
     def val_dataloader(self) -> DataLoader[Any]:
         """Create and return the validation dataloader.
 
-        :return: The validation dataloader.
+        Returns:
+            DataLoader[Any]: The validation dataloader.
         """
         return DataLoader(
             dataset=self._data_val,
             collate_fn=ObjectSegmentationDataset.collate_fn,
-            # worker_init_fn=worker_init_fn,
             **self.hparams.dataloader_cfg,
         )
 
     def test_dataloader(self) -> DataLoader[Any]:
         """Create and return the test dataloader.
 
-        :return: The test dataloader.
+        Returns:
+            DataLoader[Any]: The test dataloader.
         """
         return DataLoader(
             dataset=self._data_test,
             collate_fn=ObjectSegmentationDataset.collate_fn,
-            # worker_init_fn=worker_init_fn,
             **self.hparams.dataloader_cfg,
         )
 
     def teardown(self, stage: Optional[str] = None) -> None:
-        """Lightning hook for cleaning up after `trainer.fit()`, `trainer.validate()`,
-        `trainer.test()`, and `trainer.predict()`.
+        """Called at the end of training, validation, test, or predict. Use for
+        cleaning up things and saving files.
 
-        :param stage: The stage being torn down. Either `"fit"`, `"validate"`, `"test"`,
-            or `"predict"`. Defaults to ``None``.
+        Args:
+            stage (Optional[str], optional): The stage being torn down. Either `"fit"`,
+                `"validate"`, `"test"`, or `"predict"`. Defaults to None.
         """
         pass
 
     def state_dict(self) -> Dict[Any, Any]:
-        """Called when saving a checkpoint. Implement to generate and save the
-        datamodule state.
+        """Implement to return the datamodule state to save in a checkpoint.
 
-        :return: A dictionary containing the datamodule state that you want to save.
+        Returns:
+            Dict[Any, Any]: A dictionary containing the datamodule state that you want
+                to save.
         """
         return {}
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        """Called when loading a checkpoint. Implement to reload datamodule state given
-        datamodule `state_dict()`.
+        """Implement to load the datamodule state from a checkpoint.
 
-        :param state_dict: The datamodule state returned by `self.state_dict()`.
+        Args:
+            state_dict (Dict[str, Any]): The datamodule state returned by
+                `self.state_dict()`.
         """
         pass
     

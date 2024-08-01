@@ -1,3 +1,8 @@
+"""
+A generic model used to predict probabilistic masks from RGB images and binary masks.
+The details of the model are abstracted away; have a look at the probabilistic
+segmentation models for more information.
+"""
 # Standard libraries
 from typing import Optional
 
@@ -15,18 +20,7 @@ from toolbox.modules.mobile_sam_module import MobileSAM
 
 class ObjectSegmentationModel(nn.Module):
     """
-    TODO: update description
-    This module is composed of four parts:
-        1. A rendering stage that renders the object in a perturbed pose and extracts
-            points along the object contour;
-        2. A light Segment Anything Model (MobileSAM) for explicit object segmentation
-            alignment;
-        
-        (1. and 2. can be abandoned if we use ground truth masks as explicit segmentation)
-        
-        3. A ResNet18 model for implicit object segmentation prediction.
-        4. A segmentation mask module for generating segmentation masks from the
-            predicted implicit probabilistic object segmentation.
+    A module that performs object segmentation using a probabilistic segmentation model.
     """
     def __init__(
         self,
@@ -37,8 +31,24 @@ class ObjectSegmentationModel(nn.Module):
         object_set_cfg: Optional[DictConfig] = None,
         compile: bool = False,
     ) -> None:
-        """
-        Initialize an `ObjectSegmentationModel` module.
+        """Constructor.
+
+        Args:
+            probabilistic_segmentation_model (nn.Module): The probabilistic segmentation
+                model. It should take RGB images and binary masks as input, and return
+                probabilistic masks as output.
+            image_size (ListConfig): The size of the input images.
+            use_gt_masks (bool, optional): Whether to use ground truth masks instead of
+                predicting them using the MobileSAM module. If True, the MobileSAM
+                module will not be used. Defaults to True.
+            sam_checkpoint (Optional[str], optional): The path to the checkpoint of the
+                MobileSAM module. Not needed if `use_gt_masks` is True.
+                Defaults to None.
+            object_set_cfg (Optional[DictConfig], optional): The configuration of the
+                object set used to render objects. Not needed if `use_gt_masks` is True.
+                Defaults to None.
+            compile (bool, optional): Whether to compile the MobileSAM module. Defaults
+                to False.
         """
         super().__init__()
         

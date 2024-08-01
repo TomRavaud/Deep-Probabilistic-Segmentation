@@ -6,13 +6,6 @@ optimizer:
   lr: 0.001
   weight_decay: 0.00001
 
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.LinearLR
-#   _partial_: true
-#   start_factor: 1.0
-#   end_factor: 0.5
-#   total_iters: 50
-
 scheduler:
   main_scheduler:
     _target_: torch.optim.lr_scheduler.SequentialLR

@@ -1,3 +1,6 @@
+"""
+Script to call for launching the training of a model.
+"""
 # Standard libraries
 from typing import List
 import sys
@@ -45,36 +48,6 @@ def train(cfg: DictConfig) -> tuple:
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
     
-    # datamodule.setup()
-    
-    # # Get 1st data
-    # batch = next(iter(datamodule.train_dataloader()))
-    
-    # # Visualize the data
-    # for i in range(cfg.data.dataloader_cfg.batch_size):
-        
-    #     print(batch.object_datas[i].label)
-        
-    #     # Get the image
-    #     img = batch.rgbs[i].permute(1, 2, 0).numpy()
-    #     # Image to BGR
-    #     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        
-    #     clines_rgb = batch.clines_rgbs[i].permute(1, 2, 0).numpy()
-    #     clines_rgb = cv2.cvtColor(clines_rgb, cv2.COLOR_RGB2BGR)
-        
-    #     # Save the clines
-    #     # cv2.imwrite(f"z_clines_{i}.png", clines_rgb)
-        
-    #     # Draw the bounding box
-    #     # bbox = batch.bboxes[i].numpy()
-    #     # bbox = bbox.astype(int)
-    #     # cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
-        
-    #     # cv2.imshow("Image", img)
-    #     # cv2.waitKey(0)
-    
-    
     log.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
     
@@ -109,8 +82,6 @@ def train(cfg: DictConfig) -> tuple:
         log.info("Starting training...")
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
 
-        # model(batch)
-    
     train_metrics = trainer.callback_metrics
     
     if cfg.get("test"):

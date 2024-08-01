@@ -2,13 +2,6 @@
 from pathlib import Path
 from typing import Optional, List
 
-# TODO: to remove
-import sys
-
-# Add the src directory to the system path
-# (to avoid having to install project as a package)
-sys.path.append("src/")
-
 # Third-party libraries
 import torch
 from torchvision import transforms
@@ -292,36 +285,4 @@ class RBOT(torch.utils.data.Dataset):
 
 
 if __name__ == '__main__':
-    
-    import cv2
-    
-    scenes_models_dict = {
-        "a_regular": ["ape", "cat"],
-        "b_dynamiclight": ["ape", "phone"],
-    }
-    
-    transformations_cfg = DictConfig(
-        {
-            "resize": [240, 320],
-        }
-    )
-    
-    dataset = RBOT(
-        root="data/RBOT",
-        scenes_models_dict=scenes_models_dict,
-        frames_per_sequence=10,
-        step_between_frames=3,
-        transformations_cfg=transformations_cfg,
-    )
-    
-    print(len(dataset))
-    print(dataset[0].rgbs.shape)
-     
-    img = dataset[0].rgbs[0]
-    img = img.permute(1, 2, 0).numpy()
-    
-    # Image to BGR
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    
-    cv2.imshow("Image", img)
-    cv2.waitKey(0)
+    pass

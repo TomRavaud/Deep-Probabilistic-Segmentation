@@ -6,13 +6,6 @@ optimizer:
   lr: 0.001
   weight_decay: 0.00001
 
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.LinearLR
-#   _partial_: true
-#   start_factor: 1.0
-#   end_factor: 0.5
-#   total_iters: 20
-
 scheduler:
   main_scheduler:
     _target_: torch.optim.lr_scheduler.SequentialLR
@@ -32,17 +25,6 @@ scheduler:
 model:
   _target_: models.components.object_segmentation_model.ObjectSegmentationModel
 
-  # probabilistic_segmentation_model:
-  #   _target_: toolbox.modules.probabilistic_segmentation_lookup.ProbabilisticSegmentationLookup
-  #   net_cls:
-  #     _target_: toolbox.modules.simple_resnet_module.SimpleResNet
-  #     _partial_: true
-  #     version: 18
-  #     nb_input_channels: 4
-  #   compile: false
-  #   use_histograms: false
-  #   output_logits: true
-  
   probabilistic_segmentation_model:
     _target_: toolbox.modules.probabilistic_segmentation_mlp.ProbabilisticSegmentationMLP
     net_cls:
@@ -54,7 +36,6 @@ model:
 
     patch_size: 5
     mlp_hidden_dims: [64, 32, 16]
-    # mlp_hidden_dims: [128, 64, 32]
     apply_color_transformations: true
     compile: false
     output_logits: true
@@ -76,29 +57,6 @@ model:
 
   # Compile parts of the model for faster training with PyTorch 2.0
   compile: false
-
-
-# criterion:
-#   _target_: torch.nn.BCEWithLogitsLoss
-#   reduction: mean
-
-# criterion:
-#   _target_: models.components.segmentation_losses.DiceLoss
-
-#   # Dice loss parameters
-#   smooth: 1.0  # Smoothing factor
-
-#   with_logits: true  # If 'true', sigmoid activation is applied
-
-
-# criterion:
-#   _target_: models.components.segmentation_losses.FocalLoss
-
-#   # Focal loss parameters
-#   gamma: 2.0  # Focusing parameter
-#   alpha: 0.25  # Balancing parameter (percentage of negative samples)
-
-#   with_logits: true  # If 'true', sigmoid activation is applied
 
 
 criterion:

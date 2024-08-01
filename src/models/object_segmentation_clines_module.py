@@ -1,3 +1,8 @@
+"""
+Lightning component used to make predictions and compute losses on object segmentation
+tasks. This specific model is suited for lines probabilistic mask predictions from RGB
+images, binary masks and RGB images of the lines.
+"""
 # Standard libraries
 from typing import Any, Dict, Tuple
 from functools import partial
@@ -7,21 +12,23 @@ import torch
 from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric
 from omegaconf import DictConfig
-
-# Custom modules
-from toolbox.datasets.segmentation_dataset import BatchSegmentationData
-
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+
+# Custom modules
+from toolbox.datasets.segmentation_dataset import BatchSegmentationData
 
 # Change font
 plt.rcParams.update({"font.family": "serif"})
 
 
 class ObjectSegmentationCLinesLitModule(LightningModule):
-    
+    """
+    A Lightning module used to make predictions and compute losses on lines
+    segmentation tasks. This specific model is suited for lines probabilistic mask
+    predictions from RGB images, binary masks and RGB images of the lines.
+    """
     def __init__(
         self,
         model: torch.nn.Module,
@@ -29,6 +36,16 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
     ) -> None:
+        """Constructor.
+
+        Args:
+            model (torch.nn.Module): The model used to make predictions.
+            criterion (torch.nn.Module): The loss function used to compute the loss.
+            optimizer (torch.optim.Optimizer): The optimizer used to update the model's
+                parameters.
+            scheduler (torch.optim.lr_scheduler): The learning rate scheduler used to
+                update the learning rate.
+        """
         super().__init__()
 
         # Allows to access init params with 'self.hparams' attribute
@@ -61,8 +78,10 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         return self._model(x)
 
     def on_train_start(self) -> None:
-        """Lightning hook that is called when training begins."""
-        # by default lightning executes validation step sanity checks before training
+        """
+        Lightning hook that is called when training begins.
+        """
+        # By default lightning executes validation step sanity checks before training
         # starts, so it's worth to make sure validation metrics don't store results
         # from these checks
         self._val_loss.reset()
@@ -72,13 +91,24 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         self,
         batch: BatchSegmentationData,
     ) -> torch.Tensor:
-        """Perform a single training step on a batch of data from the training set."""
+        """Perform a single training step on a batch of data from the training set.
+
+        Args:
+            batch (BatchSegmentationData): A batch of data.
+
+        Returns:
+            torch.Tensor: The computed loss.
+        """
         # Compute the output of the model
         clines_segmentation_masks = self.forward(batch)
         
         # Get the GT masks
         clines_masks = batch.clines_masks
         
+        #----------------------------------------------------------------------#
+        # Compute a loss for binary segmentation of lines which focuses on the #
+        # non-padded part of the lines                                         #
+        #----------------------------------------------------------------------#
         losses = []
         
         # Focus only on the non-padded part of the lines
@@ -122,7 +152,6 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
             plt.savefig("result_segmentation.png")
             plt.close()
 
-
         # Update and log metric (average loss across batches)
         self._train_loss(loss)
         self.log(
@@ -136,22 +165,30 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         return loss
     
     def on_train_epoch_end(self) -> None:
-        "Lightning hook that is called when a training epoch ends."
+        """
+        Lightning hook that is called when a training epoch ends.
+        """
         pass
 
     def validation_step(
         self,
         batch: BatchSegmentationData,
     ) -> None:
-        """Perform a single validation step on a batch of data from the validation
-        set.
-        """ 
+        """Perform a single validation step on a batch of data from the validation set.
+
+        Args:
+            batch (BatchSegmentationData): A batch of data.
+        """
         # Compute the output of the model
         clines_segmentation_masks = self.forward(batch)
         
         # Get the GT masks
         clines_masks = batch.clines_masks
         
+        #----------------------------------------------------------------------#
+        # Compute a loss for binary segmentation of lines which focuses on the #
+        # non-padded part of the lines                                         #
+        #----------------------------------------------------------------------#
         losses = []
         
         # Focus only on the non-padded part of the lines
@@ -178,7 +215,6 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
 
         loss = torch.mean(torch.stack(losses))
         
-        
         # Update and log metric
         self._val_loss(loss)
         self.log(
@@ -190,7 +226,9 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         )
 
     def on_validation_epoch_end(self) -> None:
-        "Lightning hook that is called when a validation epoch ends."
+        """
+        Lightning hook that is called when a validation epoch ends.
+        """
         val_loss = self._val_loss.compute()  # get current val loss
         self._val_loss_best(val_loss)  # update best so far val loss
         self.log(
@@ -205,6 +243,9 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         batch: Tuple[torch.Tensor, torch.Tensor],
     ) -> None:
         """Perform a single test step on a batch of data from the test set.
+
+        Args:
+            batch (Tuple[torch.Tensor, torch.Tensor]): A batch of data.
         """
          # Compute the output of the model
         clines_segmentation_masks = self.forward(batch)
@@ -212,6 +253,10 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         # Get the GT masks
         clines_masks = batch.clines_masks
         
+        #----------------------------------------------------------------------#
+        # Compute a loss for binary segmentation of lines which focuses on the #
+        # non-padded part of the lines                                         #
+        #----------------------------------------------------------------------#
         losses = []
         
         # Focus only on the non-padded part of the lines
@@ -238,7 +283,6 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
 
         loss = torch.mean(torch.stack(losses))
         
-
         # Update and log metric
         self._test_loss(loss)
         self.log(
@@ -250,12 +294,16 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         )
 
     def on_test_epoch_end(self) -> None:
-        """Lightning hook that is called when a test epoch ends."""
+        """
+        Lightning hook that is called when a test epoch ends.
+        """
         pass
 
     def setup(self, stage: str) -> None:
-        """Lightning hook that is called at the beginning of fit (train + validate),
-        validate, test, or predict.
+        """Setup the model for training/validation/testing.
+
+        Args:
+            stage (str): The stage of training (train, val, test).
         """
         pass
 

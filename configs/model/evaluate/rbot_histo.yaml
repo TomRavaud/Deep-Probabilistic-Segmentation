@@ -1,4 +1,3 @@
-# model:
 _target_: toolbox.evaluation.sequence_segmentation_prediction_module.SequenceSegmentationPredictionModel
 
 probabilistic_segmentation_model:

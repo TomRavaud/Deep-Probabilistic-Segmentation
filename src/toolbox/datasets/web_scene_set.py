@@ -31,11 +31,32 @@ class WebSceneSet(SceneSet):
         self,
         wds_dir: Path,
         split_range: tuple = (0., 1.),
-        load_depth: bool = True,
+        load_depth: bool = False,
         load_segmentation: bool = True,
         label_format: str = "{label}",
         load_frame_index: bool = False,
-    ):
+        external_index_frame_dir: Path = None,
+    ) -> None:
+        """Constructor.
+
+        Args:
+            wds_dir (Path): Directory containing the webdataset files.
+            split_range (tuple, optional): Range of the split to load. Defaults to
+                (0., 1.).
+            load_depth (bool, optional): Whether to load the depth images or not.
+                Defaults to False.
+            load_segmentation (bool, optional): Whether to load the segmentation
+                images or not. Defaults to True.
+            label_format (str, optional): Format of the label to use in the object
+                data objects. Defaults to "{label}".
+            load_frame_index (bool, optional): Whether to load the frame index or
+                not. Defaults to False.
+            external_index_frame_dir (Path, optional): Path to the directory containing the
+                index frame dataframes. Defaults to None.
+
+        Raises:
+            ValueError: If the index frame directory does not exist.
+        """
         self.label_format = label_format
         self.wds_dir = wds_dir
         self.split_range = split_range
@@ -58,10 +79,8 @@ class WebSceneSet(SceneSet):
             load_segmentation=load_segmentation,
         )
         
-        
-        #TODO: to clean
         # Path to the directory used to map scene_is and view_id to shard_id and key
-        self._index_frame_dir = Path("data/webdatasets/frame_index")
+        self._index_frame_dir = external_index_frame_dir
         
         # Check if the index frame directory exists
         if not self.index_frame_dir.exists():
@@ -106,7 +125,22 @@ def load_scene_ds_obs(
     label_format: str = "{label}",
     index_frame_dir: Path = None,
 ) -> SceneObservation:
-    
+    """Load a scene observation from a webdataset sample.
+
+    Args:
+        sample (Dict[str, Union[bytes, str]]): The sample.
+        depth_scale (float, optional): Scale factor for the depth image
+            conversion. Defaults to 1000.0.
+        load_depth (bool, optional): Whether to load the depth image or not.
+            Defaults to False.
+        label_format (str, optional): Format of the label to use in the object
+            data objects. Defaults to "{label}".
+        index_frame_dir (Path, optional): Path to the directory containing the
+            index frame dataframes. Defaults to None.
+
+    Returns:
+        SceneObservation: The scene observation.
+    """
     assert isinstance(sample["rgb.png"], bytes)
     assert isinstance(sample["segmentation.png"], bytes)
     assert isinstance(sample["depth.png"], bytes)

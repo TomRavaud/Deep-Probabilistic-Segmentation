@@ -2,13 +2,6 @@
 import random
 from copy import deepcopy
 
-# TODO: to remove
-import sys
-
-# Add the src directory to the system path
-# (to avoid having to install project as a package)
-sys.path.append("src/")
-
 # Third-party libraries
 import numpy as np
 import torch
@@ -134,17 +127,4 @@ class CropResizeToAspectTransform:
 
 
 if __name__ == "__main__":
-    
-    input_data = SequenceSegmentationData(
-        rgbs=torch.randint(0, 255, (10, 3, 512, 640), dtype=torch.uint8),
-        TCO=torch.eye(4, dtype=torch.float32).repeat(10, 1, 1),
-        K=torch.eye(3, dtype=torch.float32),
-        object_label="object",
-    )
-    
-    transform = CropResizeToAspectTransform()
-    
-    transformed_data = transform(input_data)
-    
-    print(transformed_data.rgbs.shape)
-    print(transformed_data.K.shape)
+    pass

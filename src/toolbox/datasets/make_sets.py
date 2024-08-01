@@ -1,3 +1,8 @@
+"""
+Contains functions to create object and scene sets. Objects sets are used to
+load and manipulate 3D models (e.g. rendering). Scene sets are used to load
+information about scenes (images, depth maps, object poses, etc.).
+"""
 # Standard libraries
 from typing import Optional
 from pathlib import Path
@@ -66,6 +71,7 @@ def make_scene_set(
     split_range: tuple = (0., 1.),
     load_depth: bool = False,
     n_frames: Optional[int] = None,
+    external_index_frame_dir: Optional[Path] = None,
 ) -> SceneSet:
     """Create a SceneSet object from the a given set name and path.
 
@@ -76,6 +82,8 @@ def make_scene_set(
             Defaults to False.
         n_frames (Optional[int], optional): Number of frames to load.
             Defaults to None.
+        external_index_frame_dir (Optional[Path], optional): Path to the directory
+            containing the index frame dataframes. Defaults to None.
 
     Raises:
         ValueError: If the set name is unknown.
@@ -86,8 +94,11 @@ def make_scene_set(
     # Datasets in webdataset format
     if set_name.startswith("webdataset."):
         set_name = set_name[len("webdataset.") :]
-        scene_set = WebSceneSet(set_path / set_name, split_range=split_range)
-
+        scene_set = WebSceneSet(
+            set_path / set_name,
+            split_range=split_range,
+            external_index_frame_dir=external_index_frame_dir,
+        )
     else:
         raise ValueError(f"Unknown scene set name: {set_name}")
 
@@ -139,6 +150,7 @@ def make_iterable_scene_set(
             load_depth=input_depth,
             set_path=path,
             split_range=tuple(this_set_config.split_range),
+            external_index_frame_dir=Path(this_set_config.external_index_frame_dir)
         )
         
         # Convert the SceneSet into an IterableSceneSet

@@ -154,8 +154,8 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             background_augmentations (Optional[SceneObservationTransform], optional):
                 Augmentations to apply to the background of the observation. Defaults
                 to [].
-            clines_dir (Optional[str], optional): Directory containing the correspondences
-                lines. Defaults to None.
+            clines_dir (Optional[str], optional): Directory containing the
+                correspondences lines. Defaults to None.
         """
         self._scene_set = scene_set
         self._min_area = min_area
@@ -482,20 +482,6 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 lines_padding="repeat",
             )
         
-        
-        # TODO: to remove
-        # rgb = obs.rgb
-        # import matplotlib.pyplot as plt
-        # from matplotlib.patches import Rectangle
-        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        # ax.imshow(rgb)
-        # bbox = object_data.bbox_modal
-        # ax.add_patch(Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
-        #                             edgecolor="red", facecolor="none"))
-        # # Save fig
-        # plt.savefig("rgb_bbox_original.png")
-        
-        
         # Resize the observation
         s = time.time()
         if self._resize_transform is not None:
@@ -506,39 +492,12 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 obs = self._resize_transform(obs)
         timings["resize_augmentation"] = time.time() - s
         
-        
-        # TODO: to remove
-        # # Debugging
-        # rgb = obs.rgb
-        # mask = (obs.segmentation == object_data.unique_id).astype(np.float32)
-        # for obj in obs.object_datas:
-        #     if obj.unique_id == object_data.unique_id:
-        #         bbox = obj.bbox_modal
-        # # bbox = object_data.bbox_modal
-        # # Plot and save images
-        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        # ax.imshow(rgb)
-        # ax.add_patch(Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
-        #                          edgecolor="red", facecolor="none"))
-        # # Save fig
-        # plt.savefig("rgb_bbox.png")
-        
-        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        # ax.imshow(mask)
-        # # Save fig
-        # plt.savefig("mask.png")
-        
-        # # Plot and save the clines
-        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        # ax.imshow(clines_rgb)
-        # # Save fig
-        # plt.savefig("clines_rgb.png")
-        
-        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        # ax.imshow(clines_mask)
-        # # Save fig
-        # plt.savefig("clines_mask.png")
-        
+        # Get the new bounding box of the object after the resize
+        bbox = None
+        for obj in obs.object_datas:
+            if obj.unique_id == object_data.unique_id:
+                bbox = obj.bbox_modal
+                break
         
         timings["total"] = time.time() - start
 
@@ -548,7 +507,6 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
 
         self._timings = timings
 
-
         # Add depth to SegmentationData
         data = SegmentationData(
             rgb=obs.rgb,
@@ -556,7 +514,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             clines_rgb=clines_rgb,
             clines_mask=clines_mask,
             depth=obs.depth if obs.depth is not None else None,
-            bbox=object_data.bbox_modal,
+            bbox=bbox,
             K=obs.camera_data.K,
             TCO=TCO,
             DTO=DTO,

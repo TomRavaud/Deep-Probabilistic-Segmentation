@@ -28,6 +28,7 @@ scene_sets_cfg:
       - name: webdataset.gso_5
         split_range: [0.0, 1.0]
         n_repeats: 1  # Number of times to repeat the set
+        external_index_frame_dir: ${paths.data_dir}/frame_index
   
   val:
     dir: ${paths.data_dir}
@@ -36,6 +37,7 @@ scene_sets_cfg:
       - name: webdataset.gso_5
         split_range: [0.0, 1.0]
         n_repeats: 1
+        external_index_frame_dir: ${paths.data_dir}/frame_index
   
   test:
     dir: ${paths.data_dir}
@@ -44,6 +46,7 @@ scene_sets_cfg:
       - name: webdataset.gso_5
         split_range: [0.0, 1.0]
         n_repeats: 1
+        external_index_frame_dir: ${paths.data_dir}/frame_index
 
 # Dataset parameters
 dataset_cfg:
@@ -69,6 +72,8 @@ dataset_cfg:
   # Scale factors for perturbations sampling
   rel_translation_scale: 0.3  # normalized units
   abs_rotation_scale: 20.0  # degrees
+
+  clines_dir: ${paths.data_dir}/gso_1M_clines_coords
 
 # Dataloader parameters
 dataloader_cfg:
