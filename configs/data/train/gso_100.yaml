@@ -51,8 +51,7 @@ dataset_cfg:
   # Minimum area of the modal bounding box of an object to be
   # considered as a valid object (should be consistent with the
   # image size)
-  # min_area: 10000
-  min_area: 2500
+  min_area: 10000
 
   # Whether to choose the first valid object in the scene or a
   # random one
@@ -83,8 +82,10 @@ dataloader_cfg:
 transformations_cfg:
 
   # Resize the images to the specified size
-  resize: [240, 320]
-  # resize: [480, 640]
+  resize:
+    size: [240, 320]
+    # Focus on the object in the image, else the whole image is resized
+    object_focus: True
 
   # Probability of applying the augmentations
   augmentations_p: 0.8

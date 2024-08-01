@@ -436,33 +436,19 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             clines_rgb = np.zeros((1, 1, 3))
             clines_mask = np.zeros((1, 1))
         
+        # Load the correspondence lines and mask
         else:
-            # Load the correspondence lines and mask
             shard_id = obs.infos.shard_id
             key = obs.infos.key
 
+            # Path to the correspondence lines coordinates
             obs_clines_path = Path(self._clines_dir) / f"{shard_id}"
-            # obs_clines_rgb_path =\
-            #     obs_clines_path / f"{key}_{object_data.unique_id}.clines.rgb.npy"
-            # obs_clines_mask_path =\
-            #     obs_clines_path / f"{key}_{object_data.unique_id}.clines.seg.npy"
-            # obs_clines_rgb_path =\
-            #     obs_clines_path / f"{key}/{object_data.unique_id}.clines.rgb.npy"
-            # obs_clines_mask_path =\
-            #     obs_clines_path / f"{key}/{object_data.unique_id}.clines.seg.npy"
-            obs_clines_path = obs_clines_path / f"{key}/{object_data.unique_id}.clines.npy"
+            obs_clines_path =\
+                obs_clines_path / f"{key}/{object_data.unique_id}.clines.npy"
 
             # Check that the files exist
-            # if not obs_clines_rgb_path.exists() or not obs_clines_mask_path.exists():
-            #     return None
             if not obs_clines_path.exists():
                 return None
-            
-            # print("Loading clines")
-            # start = time.time()
-            # clines_rgb = np.load(obs_clines_rgb_path)
-            # clines_mask = np.load(obs_clines_mask_path)
-            # print(f"Time to load clines: {time.time() - start:.4f} s")
             
             # Load the clines coordinates
             clines = np.load(obs_clines_path)
@@ -496,11 +482,63 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
                 lines_padding="repeat",
             )
         
+        
+        # TODO: to remove
+        # rgb = obs.rgb
+        # import matplotlib.pyplot as plt
+        # from matplotlib.patches import Rectangle
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        # ax.imshow(rgb)
+        # bbox = object_data.bbox_modal
+        # ax.add_patch(Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
+        #                             edgecolor="red", facecolor="none"))
+        # # Save fig
+        # plt.savefig("rgb_bbox_original.png")
+        
+        
         # Resize the observation
         s = time.time()
         if self._resize_transform is not None:
-            obs = self._resize_transform(obs)
+            if self._resize_transform.__class__.__name__ ==\
+                "CropResizeToObjectTransform":
+                    obs = self._resize_transform(obs, object_data.unique_id)
+            else:
+                obs = self._resize_transform(obs)
         timings["resize_augmentation"] = time.time() - s
+        
+        
+        # TODO: to remove
+        # # Debugging
+        # rgb = obs.rgb
+        # mask = (obs.segmentation == object_data.unique_id).astype(np.float32)
+        # for obj in obs.object_datas:
+        #     if obj.unique_id == object_data.unique_id:
+        #         bbox = obj.bbox_modal
+        # # bbox = object_data.bbox_modal
+        # # Plot and save images
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        # ax.imshow(rgb)
+        # ax.add_patch(Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1],
+        #                          edgecolor="red", facecolor="none"))
+        # # Save fig
+        # plt.savefig("rgb_bbox.png")
+        
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        # ax.imshow(mask)
+        # # Save fig
+        # plt.savefig("mask.png")
+        
+        # # Plot and save the clines
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        # ax.imshow(clines_rgb)
+        # # Save fig
+        # plt.savefig("clines_rgb.png")
+        
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        # ax.imshow(clines_mask)
+        # # Save fig
+        # plt.savefig("clines_mask.png")
+        
         
         timings["total"] = time.time() - start
 

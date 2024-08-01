@@ -34,7 +34,7 @@ class SceneObservationTransform(ABC):
         """
         self._p = p
     
-    def __call__(self, obs: SceneObservation) -> SceneObservation:
+    def __call__(self, obs: SceneObservation, *args, **kwargs) -> SceneObservation:
         """Apply or not the transformation to the observation given the
         probability `p`.
 
@@ -45,12 +45,12 @@ class SceneObservationTransform(ABC):
             SceneObservation: Eventually transformed scene observation.
         """
         if random.random() <= self._p:
-            return self._transform(obs)
+            return self._transform(obs, *args, **kwargs)
         else:
             return obs
     
     @abstractmethod
-    def _transform(self, obs: SceneObservation) -> SceneObservation:
+    def _transform(self, obs: SceneObservation, *args, **kwargs) -> SceneObservation:
         """Define the transformation to apply to the observation.
 
         Args:
@@ -1125,6 +1125,221 @@ class CropResizeToAspectTransform(SceneObservationTransform):
         # Update modal object bounding boxes
         dets_gt =\
             CropResizeToAspectTransform.make_detections_from_segmentation(
+                new_obs.segmentation[None]
+            )[0]
+        
+        new_object_datas = []
+        
+        for obj in obs.object_datas:
+            
+            if obj.unique_id in dets_gt:
+                new_obj = dataclasses.replace(
+                    obj,
+                    bbox_modal=dets_gt[obj.unique_id],
+                    bbox_amodal=None,
+                    visib_fract=None,
+                )
+                new_object_datas.append(new_obj)
+        
+        new_obs.object_datas = new_object_datas
+        
+        return new_obs
+
+
+class CropResizeToObjectTransform(SceneObservationTransform):
+    """
+    Crop and resize the RGB, segmentation, and depth observations to focus on
+    a specific object.
+    """
+    def __init__(
+        self,
+        resize: Resolution = (480, 640),
+        scale_factor: float = 1.5,
+        p: float = 1.0,
+    ) -> None:
+        """Constructor.
+
+        Args:
+            resize (Resolution, optional): Target aspect ratio (height, width).
+                Defaults to (480, 640).
+            scale_factor (float, optional): Factor to scale the bounding box of the
+                object. Defaults to 1.5.
+            p (float, optional): Probability of applying the transformation.
+                Defaults to 1.0.
+
+        Raises:
+            ValueError: If the width is less than the height.
+        """
+        super().__init__(p)
+        
+        if resize[1] < resize[0]:
+            raise ValueError("The width must be greater than the height.")
+        
+        self._resize = resize
+        self._aspect = max(resize) / min(resize)
+        self.scale_factor = scale_factor
+    
+    @staticmethod
+    def make_detections_from_segmentation(
+        segmentations: np.ndarray,
+    ) -> List[Dict[int, np.ndarray]]:
+        """Make detections from segmentations.
+
+        Args:
+            segmentations (np.ndarray): Segmentations.
+
+        Returns:
+            List[Dict[int, np.ndarray]]: List of detections.
+        """
+        assert segmentations.ndim == 3
+        detections = []
+        
+        for segmentation_n in segmentations:
+            
+            dets_n = {}
+            
+            for unique_id in np.unique(segmentation_n):
+                
+                ids = np.where(segmentation_n == unique_id)
+                x1, y1, x2, y2 = (
+                    np.min(ids[1]),
+                    np.min(ids[0]),
+                    np.max(ids[1]),
+                    np.max(ids[0]),
+                )
+                dets_n[int(unique_id)] = np.array([x1, y1, x2, y2])
+            
+            detections.append(dets_n)
+        
+        return detections
+
+    def _transform(self, obs: SceneObservation, object_id: int) -> SceneObservation:
+        """Crop and resize the RGB, segmentation, and depth observations to focus on a
+        specific object.
+
+        Args:
+            obs (SceneObservation): Scene observation.
+            object_id (int): The ID of the object to focus on.
+
+        Raises:
+            ValueError: If the RGB observation is None.
+            ValueError: If the segmentation observation is None.
+            ValueError: If the camera data is None.
+            ValueError: If the object datas are None.
+            ValueError: If the segmentation dtype is not uint32.
+            ValueError: If the object ID is not present in the scene.
+            ValueError: If the depth dtype is not float32.
+            ValueError: If the segmentation mode is not 'I'.
+            ValueError: If the depth mode is not 'F'.
+
+        Returns:
+            SceneObservation: Transformed scene observation.
+        """
+        if obs.rgb is None:
+            raise ValueError("The RGB observation is None.")
+        elif obs.segmentation is None:
+            raise ValueError("The segmentation observation is None.")
+        elif obs.camera_data is None:
+            raise ValueError("The camera data is None.")
+        elif obs.object_datas is None:
+            raise ValueError("The object datas are None.")
+        elif obs.segmentation.dtype != np.uint32:
+            raise ValueError("The segmentation dtype is not uint32.")
+
+        rgb_pil = PIL.Image.fromarray(obs.rgb)
+        w, h = rgb_pil.size
+
+        # Get the bounding box of the object to focus on
+        is_object_present = False
+        for obj in obs.object_datas:
+            if obj.unique_id == object_id:
+                x1, y1, x2, y2 = obj.bbox_modal
+                is_object_present = True
+                break
+        if not is_object_present:
+            raise ValueError(
+                f"Object with ID {object_id} is not present in the scene."
+            )
+
+        bbox_w, bbox_h = x2 - x1, y2 - y1
+        x_center, y_center = (x1 + x2) / 2, (y1 + y2) / 2
+        
+        # Expand the bounding box by the scale factor
+        bbox_w, bbox_h = bbox_w * self.scale_factor, bbox_h * self.scale_factor
+        
+        # Ensure the bounding box has the correct aspect ratio
+        if bbox_w / bbox_h > self._aspect:
+            bbox_h = bbox_w / self._aspect
+        else:
+            bbox_w = bbox_h * self._aspect
+        
+        # Update the bounding box coordinates
+        x1, y1, x2, y2 = (
+            x_center - bbox_w / 2,
+            y_center - bbox_h / 2,
+            x_center + bbox_w / 2,
+            y_center + bbox_h / 2,
+        )
+
+        # Ensure the bounding box is within image bounds; if not, shift it
+        if x1 < 0:
+            x1, x2 = 0, bbox_w
+        if y1 < 0:
+            y1, y2 = 0, bbox_h
+        if x2 > w:
+            x1, x2 = w - bbox_w, w
+        if y2 > h:
+            y1, y2 = h - bbox_h, h
+
+        # Crop the image
+        box = tuple(map(int, (x1, y1, x2, y2)))
+        rgb_pil = rgb_pil.crop(box)
+        segmentation_pil = PIL.Image.fromarray(obs.segmentation).crop(box)
+        depth_pil = None
+        
+        if obs.depth is not None:
+            depth_pil = PIL.Image.fromarray(obs.depth).crop(box)
+
+        new_K = get_K_crop_resize(
+            torch.tensor(obs.camera_data.K).unsqueeze(0),
+            torch.tensor(box).unsqueeze(0),
+            orig_size=(h, w),
+            crop_resize=(y2-y1, x2-x1),
+        )[0].numpy()
+
+        # Resize to target size
+        w_resize, h_resize = max(self._resize), min(self._resize)
+        rgb_pil = rgb_pil.resize((w_resize, h_resize), resample=PIL.Image.BILINEAR)
+        segmentation_pil = segmentation_pil.resize(
+            (w_resize, h_resize),
+            resample=PIL.Image.NEAREST,
+        )
+        
+        if depth_pil is not None:
+            depth_pil = depth_pil.resize(
+                (w_resize, h_resize),
+                resample=PIL.Image.NEAREST,
+            )
+        
+        new_K = get_K_crop_resize(
+            torch.tensor(new_K).unsqueeze(0),
+            torch.tensor((0, 0, w, h)).unsqueeze(0),
+            orig_size=(y2-y1, x2-x1),
+            crop_resize=(h_resize, w_resize),
+        )[0].numpy()
+
+        new_obs = deepcopy(obs)
+        new_obs.camera_data.K = new_K
+        new_obs.camera_data.resolution = (h_resize, w_resize)
+        new_obs.rgb = np.array(rgb_pil, dtype=np.uint8)
+        new_obs.segmentation = np.array(segmentation_pil, dtype=np.int32)
+        
+        if depth_pil is not None:
+            new_obs.depth = np.array(depth_pil, dtype=np.float_)
+
+        # Update modal object bounding boxes
+        dets_gt =\
+            CropResizeToObjectTransform.make_detections_from_segmentation(
                 new_obs.segmentation[None]
             )[0]
         

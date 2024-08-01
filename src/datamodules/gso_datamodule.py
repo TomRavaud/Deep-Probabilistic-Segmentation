@@ -90,9 +90,16 @@ class GSODataModule(LightningDataModule):
             
             # Resize transform
             if "resize" in transformations_cfg:
-                self._resize_transform = transformations.CropResizeToAspectTransform(
-                    resize=transformations_cfg.resize
-                )
+                if transformations_cfg.resize.object_focus:
+                    self._resize_transform =\
+                        transformations.CropResizeToObjectTransform(
+                            resize=transformations_cfg.resize.size,
+                        )
+                else:
+                    self._resize_transform =\
+                        transformations.CropResizeToAspectTransform(
+                            resize=transformations_cfg.resize.size,
+                        )
             
             # RGB augmentations
             if "rgb_augmentations" in transformations_cfg and\
