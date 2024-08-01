@@ -3,8 +3,8 @@ _target_: lightning.pytorch.trainer.Trainer
 default_root_dir: ${paths.output_dir}
 
 min_epochs: 1  # prevents early stopping
-max_epochs: 50
-# max_epochs: 300
+# max_epochs: 50
+max_epochs: 300
 
 gradient_clip_val: 0.5
 

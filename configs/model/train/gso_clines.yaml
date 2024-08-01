@@ -6,28 +6,28 @@ optimizer:
   lr: 0.001
   weight_decay: 0.00001
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.LinearLR
-  _partial_: true
-  start_factor: 1.0
-  end_factor: 0.5
-  total_iters: 50
-
 # scheduler:
-#   main_scheduler:
-#     _target_: torch.optim.lr_scheduler.SequentialLR
-#     _partial_: true 
-#     milestones: [1]
+#   _target_: torch.optim.lr_scheduler.LinearLR
+#   _partial_: true
+#   start_factor: 1.0
+#   end_factor: 0.5
+#   total_iters: 50
+
+scheduler:
+  main_scheduler:
+    _target_: torch.optim.lr_scheduler.SequentialLR
+    _partial_: true 
+    milestones: [1]
   
-#   sub_schedulers:
-#     - _target_: torch.optim.lr_scheduler.LinearLR
-#       _partial_: true
-#       start_factor: 0.0001
-#       end_factor: 1.0
-#     - _target_: torch.optim.lr_scheduler.MultiStepLR
-#       _partial_: true
-#       milestones: [100, 180, 240, 280]
-#       gamma: 0.5
+  sub_schedulers:
+    - _target_: torch.optim.lr_scheduler.LinearLR
+      _partial_: true
+      start_factor: 0.0001
+      end_factor: 1.0
+    - _target_: torch.optim.lr_scheduler.MultiStepLR
+      _partial_: true
+      milestones: [100, 180, 240, 280]
+      gamma: 0.5
 
 model:
   _target_: models.components.object_segmentation_clines_model.ObjectSegmentationCLinesModel

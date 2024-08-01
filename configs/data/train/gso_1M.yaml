@@ -50,8 +50,7 @@ dataset_cfg:
 
   # Minimum area of the modal bounding box of an object to be
   # considered as a valid object
-  # min_area: 10000
-  min_area: 2000
+  min_area: 10000
 
   # Whether to choose the first valid object in the scene or a
   # random one
@@ -70,7 +69,7 @@ dataset_cfg:
   rel_translation_scale: 0.3  # normalized units
   abs_rotation_scale: 20.0  # degrees
 
-  clines_dir: ${paths.data_dir}/gso_1M_clines
+  clines_dir: ${paths.data_dir}/gso_1M_clines_coords
 
 # Dataloader parameters
 dataloader_cfg:
@@ -78,6 +77,7 @@ dataloader_cfg:
   num_workers: 8
   pin_memory: True
   persistent_workers: True
+  prefetch_factor: 2
 
 # Parameters for the data transforms (e.g., normalization, resizing,
 # augmentation, etc.)

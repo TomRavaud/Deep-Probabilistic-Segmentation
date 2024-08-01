@@ -345,12 +345,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         start = time.time()
         timings = {}
 
-        # Apply the transformations (resize, augmentations)
-        s = time.time()
-        if self._resize_transform is not None:
-            obs = self._resize_transform(obs)
-        timings["resize_augmentation"] = time.time() - s
-
+        # Apply the augmentations
         s = time.time()
         if self._background_augmentations is not None:
             obs = self._background_augmentations(obs)
@@ -416,14 +411,7 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
         
         assert object_data.bbox_modal is not None
 
-        timings["other"] = time.time() - s
-        timings["total"] = time.time() - start
-
-        # Convert timings to milliseconds
-        for k, v in timings.items():
-            timings[k] = v * 1000
-
-        self._timings = timings
+        timings["other"] = time.time() - s 
 
         assert obs.camera_data.K is not None
         assert obs.camera_data.TWC is not None
@@ -454,25 +442,75 @@ class ObjectSegmentationDataset(torch.utils.data.IterableDataset):
             key = obs.infos.key
 
             obs_clines_path = Path(self._clines_dir) / f"{shard_id}"
-            obs_clines_rgb_path =\
-                obs_clines_path / f"{key}_{object_data.unique_id}.clines.rgb.npy"
-            obs_clines_mask_path =\
-                obs_clines_path / f"{key}_{object_data.unique_id}.clines.seg.npy"
+            # obs_clines_rgb_path =\
+            #     obs_clines_path / f"{key}_{object_data.unique_id}.clines.rgb.npy"
+            # obs_clines_mask_path =\
+            #     obs_clines_path / f"{key}_{object_data.unique_id}.clines.seg.npy"
+            # obs_clines_rgb_path =\
+            #     obs_clines_path / f"{key}/{object_data.unique_id}.clines.rgb.npy"
+            # obs_clines_mask_path =\
+            #     obs_clines_path / f"{key}/{object_data.unique_id}.clines.seg.npy"
+            obs_clines_path = obs_clines_path / f"{key}/{object_data.unique_id}.clines.npy"
 
             # Check that the files exist
-            if not obs_clines_rgb_path.exists() or not obs_clines_mask_path.exists():
+            # if not obs_clines_rgb_path.exists() or not obs_clines_mask_path.exists():
+            #     return None
+            if not obs_clines_path.exists():
                 return None
-
-            clines_rgb = np.load(obs_clines_rgb_path)
-            clines_mask = np.load(obs_clines_mask_path)
-        
-            # Process the lines
+            
+            # print("Loading clines")
+            # start = time.time()
+            # clines_rgb = np.load(obs_clines_rgb_path)
+            # clines_mask = np.load(obs_clines_mask_path)
+            # print(f"Time to load clines: {time.time() - start:.4f} s")
+            
+            # Load the clines coordinates
+            clines = np.load(obs_clines_path)
+            
+            # Get the object binary mask
+            mask = (obs.segmentation == object_data.unique_id).astype(np.uint8)
+            
+            # Find points that are inside and outside the image
+            clines_valid = np.bitwise_and(
+                np.all(clines >= (0, 0), axis=-1),
+                np.all(clines < np.array(mask.shape), axis=-1),
+            )
+            
+            # Fill the contour lines with RGB data, and 0 for points outside the
+            # image
+            clines_rgb = np.zeros(clines.shape[:2] + (3,), np.uint8)
+            clines_rgb[clines_valid] = obs.rgb[
+                clines[clines_valid][:, 0], clines[clines_valid][:, 1]
+            ]
+            # Set the segmentation data for the contour lines, and 5 for points
+            # outside the image
+            clines_mask = np.ones(clines.shape[:2], np.uint8) * 5
+            clines_mask[clines_valid] = mask[
+                clines[clines_valid][:, 0], clines[clines_valid][:, 1]
+            ]
+            
+            # Process the lines (random length, padding, and remove invalid ones)
             clines_rgb, clines_mask = get_valid_clines(
                 clines_rgb,
                 clines_mask,
                 lines_padding="repeat",
             )
         
+        # Resize the observation
+        s = time.time()
+        if self._resize_transform is not None:
+            obs = self._resize_transform(obs)
+        timings["resize_augmentation"] = time.time() - s
+        
+        timings["total"] = time.time() - start
+
+        # Convert timings to milliseconds
+        for k, v in timings.items():
+            timings[k] = v * 1000
+
+        self._timings = timings
+
+
         # Add depth to SegmentationData
         data = SegmentationData(
             rgb=obs.rgb,

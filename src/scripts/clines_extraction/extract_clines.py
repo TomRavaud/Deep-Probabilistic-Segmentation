@@ -40,7 +40,7 @@ def extract_clines(shard_ids, config):
         # Create the output directory if it does not exist
         output_path =\
             Path(config["data_path"]) /\
-                (config["dataset_name"]+"_clines_final") / shard_id
+                (config["dataset_name"]+"_clines_to_remove") / shard_id
         output_path.mkdir(exist_ok=True, parents=True)
 
         start = time()
@@ -52,11 +52,12 @@ def extract_clines(shard_ids, config):
             
             for entry in shard:
                 
-                if "rgb.png" in entry.pathname:
-                    # Read the RGB image
-                    rgb_file = shard.read(size=entry.size)
-                    counter += 1
-                elif "segmentation.png" in entry.pathname:
+                # if "rgb.png" in entry.pathname:
+                #     # Read the RGB image
+                #     rgb_file = shard.read(size=entry.size)
+                #     counter += 1
+                if "segmentation.png" in entry.pathname:
+                # elif "segmentation.png" in entry.pathname:
                     # Read the segmentation image
                     segmentation_file = shard.read(size=entry.size)
                     counter += 1
@@ -65,16 +66,17 @@ def extract_clines(shard_ids, config):
                     obj_data_file = shard.read(size=entry.size)
                     counter += 1
                 
-                if counter == 3:
+                if counter == 2:
+                # if counter == 3:
                     
                     # Reset the counter
                     counter = 0
                     
-                    # Load the RGB image
-                    rgb = cv2.imdecode(
-                        np.frombuffer(rgb_file, np.uint8), cv2.IMREAD_COLOR
-                    )
-                    rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+                    # # Load the RGB image
+                    # rgb = cv2.imdecode(
+                    #     np.frombuffer(rgb_file, np.uint8), cv2.IMREAD_COLOR
+                    # )
+                    # rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
                     # Load the semantic segmentation data
                     segmentation = cv2.imdecode(
                         np.frombuffer(segmentation_file, np.uint8),
@@ -88,10 +90,14 @@ def extract_clines(shard_ids, config):
                     unique_ids_visible = set(np.unique(segmentation))
                     
                     img_id = entry.pathname.split(".")[0]
-
+                    
+                    # Create a directory for the image
+                    (output_path / img_id).mkdir(exist_ok=True)
+                    
                     oids = []
-                    clines_rgb_list = []
-                    clines_seg_list = []
+                    # clines_rgb_list = []
+                    # clines_seg_list = []
+                    clines_list = []
                     
                     # Process each object
                     for obj in obj_data:
@@ -100,10 +106,10 @@ def extract_clines(shard_ids, config):
                             # Get the object id
                             oid = obj["unique_id"]
 
-                            # If the files already exist, skip
-                            if (output_path / f"{img_id}_{oid}.clines.rgb.npy").exists() and\
-                                (output_path / f"{img_id}_{oid}.clines.seg.npy").exists():
-                                    continue
+                            # # If the files already exist, skip
+                            # if (output_path / f"{img_id}_{oid}.clines.rgb.npy").exists() and\
+                            #     (output_path / f"{img_id}_{oid}.clines.seg.npy").exists():
+                            #         continue
 
                             # Get the bounding box of the visible part of the object
                             bbox_modal = np.array(obj["bbox_modal"])
@@ -114,7 +120,7 @@ def extract_clines(shard_ids, config):
                             if oid not in unique_ids_visible or\
                                 np.any(bbox_modal < 0) or area < config["min_area"]:
                                     continue
-                                
+                            
                             # Extract the binary mask for the object
                             mask = (segmentation == oid).astype(np.uint8)
                             mask = extract_only_largest_contour(mask)
@@ -135,23 +141,26 @@ def extract_clines(shard_ids, config):
                             if clines is None:
                                 continue
                             
-                            # Find points that are inside and outside the image
-                            clines_valid = np.bitwise_and(
-                                np.all(clines >= (0, 0), axis=-1),
-                                np.all(clines < np.array(mask.shape), axis=-1),
-                            )
-                            # Fill the contour lines with RGB data, and 0 for points outside the
-                            # image
-                            clines_rgb = np.zeros(clines.shape[:2] + (3,), np.uint8)
-                            clines_rgb[clines_valid] = rgb[
-                                clines[clines_valid][:, 0], clines[clines_valid][:, 1]
-                            ]
-                            # Set the segmentation data for the contour lines, and 5 for points
-                            # outside the image
-                            clines_seg = np.ones(clines.shape[:2], np.uint8) * 5
-                            clines_seg[clines_valid] = mask[
-                                clines[clines_valid][:, 0], clines[clines_valid][:, 1]
-                            ]
+                            clines = clines.astype(np.int32)
+                            
+                            # # Find points that are inside and outside the image
+                            # clines_valid = np.bitwise_and(
+                            #     np.all(clines >= (0, 0), axis=-1),
+                            #     np.all(clines < np.array(mask.shape), axis=-1),
+                            # )
+                            
+                            # # Fill the contour lines with RGB data, and 0 for points outside the
+                            # # image
+                            # clines_rgb = np.zeros(clines.shape[:2] + (3,), np.uint8)
+                            # clines_rgb[clines_valid] = rgb[
+                            #     clines[clines_valid][:, 0], clines[clines_valid][:, 1]
+                            # ]
+                            # # Set the segmentation data for the contour lines, and 5 for points
+                            # # outside the image
+                            # clines_seg = np.ones(clines.shape[:2], np.uint8) * 5
+                            # clines_seg[clines_valid] = mask[
+                            #     clines[clines_valid][:, 0], clines[clines_valid][:, 1]
+                            # ]
                         
                         except Exception as e:
                             print(f"Error in {img_id}_{oid}: {e}")
@@ -160,9 +169,12 @@ def extract_clines(shard_ids, config):
                         # Save the contour lines
                         # np.save(output_path / f"{img_id}_{oid}.clines.rgb.npy", clines_rgb)
                         # np.save(output_path / f"{img_id}_{oid}.clines.seg.npy", clines_seg)
+                        
                         oids.append(oid)
-                        clines_rgb_list.append(clines_rgb)
-                        clines_seg_list.append(clines_seg)
+                        # clines_rgb_list.append(clines_rgb)
+                        # clines_seg_list.append(clines_seg)
+                        clines_list.append(clines)
+                        
                         
                         
                         # Save the figures if required
@@ -201,9 +213,13 @@ def extract_clines(shard_ids, config):
                             plt.close(fig)
                     
                     # Save the contour lines
-                    for oid, clines_rgb, clines_seg in zip(oids, clines_rgb_list, clines_seg_list):
-                        np.save(output_path / f"{img_id}_{oid}.clines.rgb.npy", clines_rgb)
-                        np.save(output_path / f"{img_id}_{oid}.clines.seg.npy", clines_seg)
+                    for oid, clines in zip(oids, clines_list):
+                        np.save(output_path / img_id / f"{oid}.clines.npy", clines)
+                    # for oid, clines_rgb, clines_seg in zip(oids, clines_rgb_list, clines_seg_list):
+                    #     np.save(output_path / img_id / f"{oid}.clines.rgb.npy", clines_rgb)
+                    #     np.save(output_path / img_id / f"{oid}.clines.seg.npy", clines_seg)
+                        # np.save(output_path / f"{img_id}_{oid}.clines.rgb.npy", clines_rgb)
+                        # np.save(output_path / f"{img_id}_{oid}.clines.seg.npy", clines_seg)
                     
         print(f"Shard {shard_id} processed in {time()-start:.2f} seconds")
 
@@ -227,7 +243,7 @@ if __name__ == "__main__":
     extract_clines_partial = partial(extract_clines, config=config)
     
     # Create the output directory if it does not exist
-    (Path(config["data_path"]) / (config["dataset_name"]+"_clines_final")).mkdir(exist_ok=True)
+    (Path(config["data_path"]) / (config["dataset_name"]+"_clines_to_remove")).mkdir(exist_ok=True)
 
     # Get the shard ids
     dataset_path = Path(config["data_path"]) / config["dataset_name"]
@@ -240,13 +256,4 @@ if __name__ == "__main__":
     with multiprocessing.Pool(20) as pool:
         pool.map(extract_clines_partial, shard_ids_split)
     
-    
     # extract_clines_partial(shard_ids[0:1])
-    
-    # Split the shard ids into shards for multiprocessing
-    # shard_ids_split = np.array_split(shard_ids[11:], 8)
-    # shard_ids_split = np.array_split(shard_ids[11:], multiprocessing.cpu_count())
-    
-    # with multiprocessing.Pool(8) as pool:
-    # # with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
-    #     pool.map(extract_clines_partial, shard_ids_split)

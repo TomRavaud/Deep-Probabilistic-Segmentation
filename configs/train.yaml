@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - data: train/gso_10
+  - data: train/gso_1M
   - model: train/gso_clines
   - callbacks: default
   - logger: default
@@ -22,7 +22,6 @@ optimized_metric: val/loss_best
 test: False
 
 # Provide a path to a checkpoint to resume training from
-# ckpt_path: logs/train/runs/2024-05-18_12-36-39*/checkpoints/epoch_492.ckpt
 ckpt_path: null
 
 # Seed for random number generators in PyTorch, numpy and python.random

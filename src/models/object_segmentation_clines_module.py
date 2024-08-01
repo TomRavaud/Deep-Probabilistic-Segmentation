@@ -73,7 +73,6 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         batch: BatchSegmentationData,
     ) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set."""
-        
         # Compute the output of the model
         clines_segmentation_masks = self.forward(batch)
         
@@ -82,6 +81,7 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         
         losses = []
         
+        # Focus only on the non-padded part of the lines
         for clines_segmentation_mask, clines_mask in zip(
             clines_segmentation_masks,
             clines_masks,
@@ -91,6 +91,10 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
             mask = clines_mask == 127
             clines_segmentation_mask = clines_segmentation_mask[~mask]
             clines_mask = clines_mask[~mask]
+            
+            # Check if there are no clines in the image
+            if not torch.any(clines_mask):
+                continue
             
             # Convert clines_mask to boolean
             clines_mask = clines_mask == 255
@@ -150,6 +154,7 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         
         losses = []
         
+        # Focus only on the non-padded part of the lines
         for clines_segmentation_mask, clines_mask in zip(
             clines_segmentation_masks,
             clines_masks,
@@ -159,6 +164,10 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
             mask = clines_mask == 127
             clines_segmentation_mask = clines_segmentation_mask[~mask]
             clines_mask = clines_mask[~mask]
+            
+            # Check if there are no clines in the image
+            if not torch.any(clines_mask):
+                continue
             
             # Convert clines_mask to boolean
             clines_mask = clines_mask == 255
@@ -205,6 +214,7 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
         
         losses = []
         
+        # Focus only on the non-padded part of the lines
         for clines_segmentation_mask, clines_mask in zip(
             clines_segmentation_masks,
             clines_masks,
@@ -214,6 +224,10 @@ class ObjectSegmentationCLinesLitModule(LightningModule):
             mask = clines_mask == 127
             clines_segmentation_mask = clines_segmentation_mask[~mask]
             clines_mask = clines_mask[~mask]
+            
+            # Check if there are no clines in the image
+            if not torch.any(clines_mask):
+                continue
             
             # Convert clines_mask to boolean
             clines_mask = clines_mask == 255
