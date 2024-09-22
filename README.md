@@ -10,7 +10,13 @@
 
 ## Description
 
-Development of a deep probabilistic binary segmentation model for the segmentation of an object to be tracked in a sequence of monocular RGB images. The aim is not to produce a mask for the current image, as is customary, but a segmentation based on color statistics that can be used on several consecutive images in the sequence (assuming the statistics are almost constant).
+Development of deep probabilistic binary segmentation models for the segmentation of an object to be tracked in a sequence of monocular RGB images. The aim is not to produce a mask for the current image, as is customary, but a segmentation based on color statistics that can be used on several consecutive images in the sequence (assuming the statistics are almost constant).
+
+More specifically, we designed two solutions:
+- A pixel-wise segmentation model using an MLP ;
+- A line-wise segmentation model using a U-Net.
+
+These two local and lightweight models are conditioned by a global appearance vector predicted by a ResNet model.
 
 
 ## Installation
@@ -40,6 +46,8 @@ To avoid downloading the whole dataset, this script allows you to specify the nu
 
 ## Meshes decimation
 
+*It is possible to train a segmentation model without having to render the 3D models, as the MegaPose dataset already provides the segmentation masks. In this case, you can skip this section.*
+
 To reduce the resolution of the 3D models, you can use the `src/scripts/meshlab/decimate_meshes.py` script. This script uses MeshLab from the Python library `PyMeshLab` and performs a quadric edge collapse decimation on the meshes. It is recommended to use it to make the batch rendering process more efficient, as we are only interested in the projected silhouette of the object in the image. To use the script, make sure you have MeshLab and PyMeshLab installed and run:
 
 ```bash
@@ -50,6 +58,14 @@ By default, the script will decimate the meshes to 1000 faces.
 ## MobileSAM weights
 
 The model makes use of the MobileSAM pretrained model. You can download the weights from the [MobileSAM repository](https://github.com/ChaoningZhang/MobileSAM). Once downloaded, set the path to the weights in the configuration file `configs/model/default.yaml` or as a command line argument.
+
+## Contour lines generation
+
+To train our line-wise segmentation model, we need to generate contour lines from the segmentation masks of the objects. To do so, you can run the following script:
+
+```bash
+python src/scripts/clines_extraction/extract_clines.py
+```
 
 ## Usage
 
@@ -69,3 +85,4 @@ python src/scripts/train.py
 ## Acknowledgement
 
 Some of the code is borrowed from [MegaPose](https://github.com/megapose6d/megapose6d) (maintained in [happypose](https://github.com/agimus-project/happypose/tree/dev)) so as to make the dataset handling easier.
+
